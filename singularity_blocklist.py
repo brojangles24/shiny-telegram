@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v6.0 - Ultimate Resiliency Edition w/ Cooler Graph)
+🚀 Singularity DNS Blocklist Aggregator (v4.2 - Final Filtering Edition)
 
 - ⚡ Implements HTTP Caching (ETag/Last-Modified) for efficient fetching.
-- 📈 NEW: Generates a Weighted Score Distribution chart for enhanced insight.
-- 🔒 Uses strict Regular Expression for robust domain validation.
-- ⚖️ Uses custom weighted scoring (4, 3, 2, 1).
+- 🔒 Robust domain processing handles AdGuard syntax (||, ^, !) AND IGNORES WHITELIST RULES (@@).
+- ⚖️ Uses custom weighted scoring (4, 3, 2, 1) and tracks source overlap.
+- 📈 Generates rich Markdown reports with historical sparklines and detailed source metrics.
 """
 import sys
 import csv
@@ -25,6 +25,8 @@ import plotly.io as pio
 
 # --- Configuration & Constants ---
 
+# Regular expression for robust domain validation. 
+# Ensures valid characters, length (max 253), and structure (requires at least one dot).
 DOMAIN_REGEX = re.compile(
     r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
 )
@@ -48,22 +50,21 @@ REGEX_TLD_FILENAME = "regex_hagezi_tlds.txt"
 UNFILTERED_FILENAME = "aggregated_full.txt"
 HISTORY_FILENAME = "history.csv"
 REPORT_FILENAME = "metrics_report.md"
-HEATMAP_IMAGE = "score_distribution_chart.png" # Renamed image for clarity
+HEATMAP_IMAGE = "overlap_heatmap_sources.png"
 DASHBOARD_HTML = "dashboard.html"
 CACHE_FILE = OUTPUT_DIR / "fetch_cache.json"
 
 # Scoring and style
 PRIORITY_CAP = 300_000
 
-# CUSTOM WEIGHTS: 
+# CUSTOM WEIGHTS: Hagezi=4, 1Hosts=3, OISD=2, StevenBlack=1
 SOURCE_WEIGHTS: Dict[str, int] = {
-    # Core Security/High-Trust (No Change)
-    "HAGEZI_ULTIMATE": 4,  
-    "1HOSTS_LITE": 3,      
-    "OISD_BIG": 2,         
-    "ADGUARD_DNS": 3,        # High quality, modern tracking filter
-    "ANUDEEP_ADSERVERS": 2,  # Excellent, dedicated ad/malware source
-    "ADAWAY_HOSTS": 2,       # Well-known, stable ad-blocking list
+    "HAGEZI_ULTIMATE": 4,
+    "1HOSTS_LITE": 3,
+    "ADGUARD_DNS": 3,
+    "OISD_BIG": 2, 
+    "ANUDEEP_ADSERVERS": 2,
+    "ADAWAY_HOSTS": 2,
     "STEVENBLACK_HOSTS": 1
 }
 MAX_SCORE = sum(SOURCE_WEIGHTS.values())
@@ -73,11 +74,14 @@ SOURCE_COLORS = {
     "HAGEZI_ULTIMATE": "#d62728", 
     "OISD_BIG": "#1f77b4",       
     "1HOSTS_LITE": "#2ca02c",    
-    "STEVENBLACK_HOSTS": "#ff7f0e" 
+    "STEVENBLACK_HOSTS": "#ff7f0e",
+    "ANUDEEP_ADSERVERS": "#9467bd",
+    "ADAWAY_HOSTS": "#8c564b",
+    "ADGUARD_DNS": "#e377c2"
 }
 ASCII_SPARKLINE_CHARS = " ▂▃▄▅▆▇█"
 
-# --- Logging Setup (remains the same) ---
+# --- Logging Setup ---
 class ConsoleLogger:
     def __init__(self, debug: bool):
         level = logging.DEBUG if debug else logging.INFO
@@ -98,7 +102,7 @@ class ConsoleLogger:
     def debug(self, msg):
         self.logger.debug(msg)
 
-# --- Utility Functions (remains the same) ---
+# --- Utility Functions ---
 
 def load_cache() -> Dict[str, Any]:
     """Loads cache headers and file content from disk."""
@@ -121,7 +125,7 @@ def save_cache(cache_data: Dict[str, Any]):
 
 def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, Any], logger: ConsoleLogger) -> List[str]:
     """Fetches list with ETag/Last-Modified caching."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/6.0'}
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/4.2'}
     
     cached_headers = cache.get("headers", {}).get(name, {})
     if 'ETag' in cached_headers:
@@ -152,24 +156,47 @@ def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, 
         logger.error(f"Error fetching {name} ({url}): {e.__class__.__name__}: {e}")
         return []
 
-
 def process_domain(line: str) -> Optional[str]:
-    """Cleans a line from a blocklist file and applies strict validation."""
-    if not line or line.startswith(("#", "!", "|")):
+    """Cleans a line from a blocklist file, handles AdGuard syntax, and applies strict validation."""
+    
+    if not line:
         return None
     
-    parts = line.split()
-    domain = parts[1] if len(parts) > 1 and parts[0] in ("0.0.0.0", "127.0.0.1") else parts[0] if len(parts) == 1 else None
+    line = line.strip().lower()
+
+    # 1. Ignore comment/empty lines AND CRITICALLY, Whitelist/Exception rules (@@)
+    if line.startswith(("#", "!", "|", "@@")):
+        return None
+    
+    # 2. Handle AdGuard/ABP Syntax (||domain.com^$modifier)
+    if line.startswith("||"):
+        # Strip the start marker
+        domain = line.lstrip("||")
+        # Strip everything after a potential $ (rule modifier) or ^ (end marker)
+        if '$' in domain:
+            domain = domain.split('$')[0]
+        if '^' in domain:
+            domain = domain.split('^')[0]
+        
+    else:
+        # 3. Handle Hosts file (0.0.0.0 domain) or simple domain list
+        parts = line.split()
+        domain = parts[1] if len(parts) > 1 and parts[0] in ("0.0.0.0", "127.0.0.1") else parts[0] if len(parts) == 1 else None
+        
+        if not domain: return None
+        domain = domain.lstrip("*").lstrip(".")
+
+    # 4. Final cleanup of common trailing symbols (explicitly handles ^ if it wasn't stripped above)
+    if domain:
+        domain = domain.rstrip('^').rstrip('!')
     
     if not domain: return None
     
-    domain = domain.strip().lower().lstrip("*").lstrip(".")
-    
-    # 1. Exclusion of reserved names
+    # 5. Exclusion of reserved names
     if domain in ("localhost", "localhost.localdomain", "::1", "255.255.255.255", "wpad"):
         return None
     
-    # 2. **STRICT REGEX VALIDATION**
+    # 6. **STRICT REGEX VALIDATION**
     if not DOMAIN_REGEX.match(domain):
         return None
     
@@ -239,7 +266,7 @@ def generate_sparkline(values: List[int], logger: ConsoleLogger) -> str:
         logger.error(f"Sparkline generation failed: {e}")
         return "N/A"
 
-# --- Core Processing Functions (remains the same) ---
+# --- Core Processing Functions ---
 
 def fetch_and_process_sources(session: requests.Session, logger: ConsoleLogger) -> Tuple[Dict[str, Set[str]], Dict[str, Set[str]]]:
     """Fetches all blocklists concurrently and returns processed domain sets."""
@@ -264,6 +291,8 @@ def fetch_and_process_sources(session: requests.Session, logger: ConsoleLogger) 
                 }
                 source_sets[name] = domains
                 all_domains_from_sources[name] = domains
+                # Report final count after processing
+                logger.info(f"🌐 Processed {len(domains):,} unique domains from **{name}**")
             except Exception as exc:
                 logger.error(f"Source {name} generated an exception: {exc}")
                 source_sets[name] = set()
@@ -344,46 +373,7 @@ def calculate_source_metrics(
             
     return dict(metrics)
 
-# --- NEW DATA PROCESSING WRAPPER ---
-def run_data_processing(logger: ConsoleLogger) -> Dict[str, Any]:
-    """
-    Encapsulates all fetching, scoring, and prioritizing steps.
-    Returns a dictionary of all final data structures to ensure scope integrity.
-    """
-    results: Dict[str, Any] = {
-        'priority_set': set(),
-        'abused_tlds': set(),
-        'full_filtered': [],
-        'combined_counter': Counter(),
-        'overlap_counter': Counter(),
-        'domain_sources': defaultdict(set),
-        'all_domains_from_sources': defaultdict(set),
-        'total_unfiltered': 0,
-        'excluded_count': 0
-    }
-    
-    with requests.Session() as session:
-        # 1. Fetch & Process (with Caching)
-        source_sets, results['all_domains_from_sources'] = fetch_and_process_sources(session, logger)
-        
-        # 2. Aggregate & Score
-        results['combined_counter'], results['overlap_counter'], results['domain_sources'] = aggregate_and_score_domains(source_sets)
-        results['total_unfiltered'] = len(results['combined_counter'])
-        logger.info(f"✨ Total unique domains across all sources: {results['total_unfiltered']:,}")
-        
-        # 3. Filter & Prioritize
-        (results['priority_set'], 
-         results['abused_tlds'], 
-         results['excluded_count'], 
-         results['full_filtered']) = filter_and_prioritize(
-            results['combined_counter'], 
-            session, 
-            logger
-        )
-        
-    return results
-
-# --- Reporting and Visualization (Updated Graph) ---
+# --- Reporting and Visualization ---
 
 def generate_interactive_dashboard(
     full_filtered: List[str], 
@@ -391,40 +381,46 @@ def generate_interactive_dashboard(
     domain_sources: Dict[str, Set[str]],
     html_path: Path,
     image_path: Path,
-    logger: ConsoleLogger,
-    combined_counter: Counter
+    logger: ConsoleLogger
 ):
-    """Generates a Plotly Bar Chart showing the distribution of weighted scores."""
+    """Generates a Plotly stacked bar chart showing source overlap."""
     logger.info(f"📈 Generating interactive weighted score dashboard at {html_path.name}")
     
-    # 1. Calculate the frequency of each weighted score for the filtered list
-    score_counts = Counter()
-    for domain in full_filtered:
-        score = combined_counter.get(domain, 0)
-        if score > 0:
-            score_counts[score] += 1
+    sources = list(BLOCKLIST_SOURCES.keys())
+    overlap_levels = sorted(
+        {overlap_counter[d] for d in full_filtered}, 
+        reverse=True
+    )
+    heatmap_data: Dict[str, List[int]] = {src: [] for src in sources}
+    
+    for level in overlap_levels:
+        domains_at_level = [d for d in full_filtered if overlap_counter[d] == level]
+        for src in sources:
+            count = sum(1 for d in domains_at_level if src in domain_sources[d])
+            heatmap_data[src].append(count)
             
-    # 2. Prepare data for plotting
-    all_scores = list(range(1, MAX_SCORE + 1))
-    score_data = [score_counts.get(s, 0) for s in all_scores]
-        
-    fig = go.Figure(data=[go.Bar(
-        x=all_scores,
-        y=score_data,
-        marker_color='#5B86E5', # Nice blue color
-        hovertemplate="<b>Weighted Score:</b> %{x}<br><b>Domain Count:</b> %{y:,}<extra></extra>"
-    )])
+    fig = go.Figure()
+    for src in sources:
+        fig.add_trace(go.Bar(
+            x=[str(l) for l in overlap_levels],
+            y=heatmap_data[src],
+            name=src,
+            marker_color=SOURCE_COLORS[src],
+            hovertemplate="<b>Source:</b> %{name}<br><b>Overlap Level:</b> %{x}<br><b>Domains:</b> %{y:}<extra></extra>"
+        ))
         
     fig.update_layout(
-        title="Distribution of Weighted Blocklist Scores (1 = Lowest, 10 = Highest Consensus)",
-        xaxis_title=f"Total Weighted Score (Max Score: {MAX_SCORE})",
-        yaxis_title="Number of Unique Domains",
+        barmode='stack',
+        title="Singularity DNS Domain Overlap Heatmap (Filtered List)",
+        xaxis_title="Number of Sources Domain Appears In",
+        yaxis_title="Domain Count (Filtered List)",
         template="plotly_dark",
-        xaxis=dict(tickmode='array', tickvals=all_scores),
+        legend_title_text="Blocklist Source",
         hovermode="x unified"
     )
     
     pio.write_html(fig, str(html_path), auto_open=False, full_html=True, include_plotlyjs='cdn')
+    image_path = image_path.parent / "score_distribution_chart.png"
     fig.write_image(str(image_path), scale=1) 
 
 
@@ -439,7 +435,6 @@ def generate_markdown_report(
     dashboard_html_path: Path,
     source_metrics: Dict[str, Dict[str, int]],
     history: List[Dict[str, str]],
-    domain_sources: Dict[str, Set[str]],
     logger: ConsoleLogger
 ):
     """Creates a detailed, aesthetic Markdown report with enhanced metrics."""
@@ -514,16 +509,16 @@ def generate_markdown_report(
 
     # --- Interactive Dashboard ---
     report.append("\n## 📈 Interactive Visualization")
-    report.append(f"The full interactive dashboard is available at: [`{DASHBOARD_HTML}`]({DASHBOARD_HTML})")
+    report.append(f"The full interactive dashboard is available at: [`dashboard.html`](dashboard.html)")
     report.append(f"\n### Static Preview")
-    report.append(f"![Weighted Score Distribution Chart]({HEATMAP_IMAGE})")
+    report.append(f"![Weighted Score Distribution Chart](score_distribution_chart.png)")
     
     # Write the report
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(report))
 
 
-# --- File Writing (remains the same) ---
+# --- File Writing ---
 
 def write_output_files(
     priority_set: Set[str], 
@@ -557,11 +552,11 @@ def write_output_files(
         
     logger.info(f"✅ Outputs written to: {output_path.resolve()}")
 
-# --- Main Execution (Updated to use wrapper) ---
+# --- Main Execution ---
 
 def main():
     """Main function to run the aggregation process."""
-    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v6.0)")
+    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v4.2)")
     parser.add_argument(
         "-o", "--output", 
         type=Path, 
@@ -580,53 +575,54 @@ def main():
     output_path.mkdir(exist_ok=True)
     
     start = datetime.now()
-    logger.info("--- 🚀 Starting Singularity DNS Aggregation (Ultimate Resiliency Edition) ---")
+    logger.info("--- 🚀 Starting Singularity DNS Aggregation (Final Filtering Edition) ---")
     
     if not Path("requirements.txt").exists():
         logger.info("💡 Recommendation: Create a 'requirements.txt' file for dependency management and stability.")
     
-    try:
-        # --- 1. Run Data Processing (Scope Resilient) ---
-        data = run_data_processing(logger)
-        
-        # Unpack results into the local scope
-        priority_set = data['priority_set']
-        full_filtered = data['full_filtered']
-        abused_tlds = data['abused_tlds']
-        overlap_counter = data['overlap_counter']
-        domain_sources = data['domain_sources']
-        all_domains_from_sources = data['all_domains_from_sources']
-        total_unfiltered = data['total_unfiltered']
-        excluded_count = data['excluded_count']
-        combined_counter = data['combined_counter'] # Needed for the new graph
+    # --- Initialization to prevent NameError in outer scope ---
+    priority_set, abused_tlds, full_filtered = set(), set(), []
+    combined_counter, overlap_counter, domain_sources = Counter(), Counter(), defaultdict(set)
+    all_domains_from_sources = defaultdict(set)
+    total_unfiltered, excluded_count = 0, 0 
 
-        # --- 2. History Tracking & Metrics ---
+    try:
         history_path = output_path / HISTORY_FILENAME
+        report_path = output_path / REPORT_FILENAME
+        heatmap_image_path = output_path / "score_distribution_chart.png"
+        dashboard_html_path = output_path / DASHBOARD_HTML
+        
+        with requests.Session() as session:
+            # 1. Fetch & Process (with Caching)
+            source_sets, all_domains_from_sources = fetch_and_process_sources(session, logger)
+            
+            # 2. Aggregate & Score
+            combined_counter, overlap_counter, domain_sources = aggregate_and_score_domains(source_sets)
+            total_unfiltered = len(combined_counter)
+            logger.info(f"✨ Total unique domains across all sources: {total_unfiltered:,}")
+            
+            # 3. Filter & Prioritize
+            priority_set, abused_tlds, excluded_count, full_filtered = filter_and_prioritize(
+                combined_counter, 
+                session, 
+                logger
+            )
+
+        # 4. History Tracking & Metrics (Runs outside the session block)
         priority_count = len(priority_set)
         change, history = track_history(priority_count, history_path, logger)
         logger.info(f"📜 History tracked. Priority list change vs. last run: {change:+}")
         
-        source_metrics = calculate_source_metrics(
-            priority_set, 
-            full_filtered, 
-            overlap_counter, 
-            domain_sources, 
-            all_domains_from_sources
-        )
+        source_metrics = calculate_source_metrics(priority_set, full_filtered, overlap_counter, domain_sources, all_domains_from_sources)
 
-        # --- 3. Reporting & Visualization ---
-        report_path = output_path / REPORT_FILENAME
-        heatmap_image_path = output_path / HEATMAP_IMAGE
-        dashboard_html_path = output_path / DASHBOARD_HTML
-        
+        # 5. Reporting & Visualization
         generate_interactive_dashboard(
             full_filtered, 
             overlap_counter, 
             domain_sources,
             dashboard_html_path,
             heatmap_image_path,
-            logger,
-            combined_counter # Pass the counter for the new graph
+            logger
         )
         
         generate_markdown_report(
@@ -640,11 +636,10 @@ def main():
             dashboard_html_path,
             source_metrics,
             history,
-            domain_sources, 
             logger
         )
         
-        # --- 4. File Writing ---
+        # 6. File Writing
         write_output_files(
             priority_set, 
             abused_tlds, 
