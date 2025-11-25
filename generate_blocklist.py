@@ -23,7 +23,7 @@ OUTPUT_FILENAME_UNFILTERED = os.path.join(OUTPUT_DIR, "aggregated_withTLD.txt")
 HISTORY_FILENAME = os.path.join(OUTPUT_DIR, "history.csv")
 REPORT_FILENAME = os.path.join(OUTPUT_DIR, "metrics_report.md") 
 
-# --- Utility Functions ---
+# --- Utility Functions (Only the critical file writing functions are shown) ---
 
 def fetch_list(url):
     """Fetches content from a URL, returns a list of lines."""
@@ -68,7 +68,6 @@ def track_history(final_metrics):
     
     source_names = list(BLOCKLIST_SOURCES.keys())
     
-    # Define the header including all required metrics
     header = ['Date', 'Final_Count', 'Change', 'Total_Unfiltered', 'Excluded_Count', 'Unique_Count'] + [f'Source_{name}' for name in source_names]
     
     history = []
@@ -162,12 +161,16 @@ def generate_markdown_report(metrics, domain_appearance_counter, final_list_set,
             if i >= 50:
                 report_content.append(f"... and {len(unique_list) - 50} more.\n")
                 break
-            report_content.append(f"{domain}\n")
+            f'{domain}\n'
         report_content.append("```\n")
 
-    # *** THIS IS THE CRITICAL FILE WRITING STEP ***
-    with open(REPORT_FILENAME, "w") as f:
-        f.write("\n".join(report_content))
+    # *** FIX: Using explicit UTF-8 encoding for reliable writing ***
+    try:
+        with open(REPORT_FILENAME, "w", encoding='utf-8') as f:
+            f.write("\n".join(report_content))
+    except Exception as e:
+        print(f"FATAL ERROR writing Markdown report: {e}", file=sys.stderr)
+        # We allow the script to continue to write the other critical files
 
     return len(unique_domains_only)
 
@@ -177,7 +180,8 @@ def write_blocklist_file(filename, list_set, source_sets, initial_count, exclude
     sorted_list = sorted(list(list_set))
     final_count = len(sorted_list)
     
-    with open(filename, "w") as f:
+    # Use explicit UTF-8 encoding for blocklists as well
+    with open(filename, "w", encoding='utf-8') as f:
         f.write("# Blocklist Aggregation Report\n")
         f.write(f"# Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write("# ------------------------------------------------------------------\n")
