@@ -56,6 +56,7 @@ CACHE_FILE = OUTPUT_DIR / "fetch_cache.json"
 
 # Scoring and style
 PRIORITY_CAP = 300_000
+CONSENSUS_THRESHOLD = 8 # New threshold for "High Consensus" domains
 
 # CUSTOM WEIGHTS: Hagezi=4, 1Hosts=3, OISD=2, StevenBlack=1
 SOURCE_WEIGHTS: Dict[str, int] = {
@@ -446,7 +447,9 @@ def generate_markdown_report(
     
     trend_icon = "⬆️" if change > 0 else "⬇️" if change < 0 else "➡️"
     trend_color = "green" if change > 0 else "red" if change < 0 else "gray"
-    max_score_count = sum(1 for d in full_filtered_list if overlap_counter.get(d) == MAX_SCORE)
+    
+    # Calculate High Consensus Count based on the new threshold
+    high_consensus_count = sum(1 for d in full_filtered_list if overlap_counter.get(d) >= CONSENSUS_THRESHOLD)
     
     # --- Historical Data ---
     report.append(f"\n## 📜 Historical Trends")
@@ -463,7 +466,10 @@ def generate_markdown_report(
     report.append("\n## 🔑 Summary Metrics")
     report.append("| Metric | Count | Details |")
     report.append("| :--- | :--- | :--- |")
-    report.append(f"| Domains with Max Score ({MAX_SCORE}) | {max_score_count:,} | Highest consensus domains (Score {MAX_SCORE}). |")
+    
+    # Updated metric to use CONSENSUS_THRESHOLD
+    report.append(f"| Domains with **High Consensus (Score {CONSENSUS_THRESHOLD}+)** | {high_consensus_count:,} | Highest consensus domains. |")
+    
     report.append(f"| Domains Excluded by TLD Filter| {excluded_count:,} | TLD filter efficacy metric. |")
     report.append(f"| Total Unique Domains (Pre-Filter) | {total_unfiltered:,} | Total candidates before TLD cleanup. |")
 
@@ -580,7 +586,7 @@ def main():
     if not Path("requirements.txt").exists():
         logger.info("💡 Recommendation: Create a 'requirements.txt' file for dependency management and stability.")
     
-    # --- Initialization to prevent NameError in outer scope ---
+    # --- Initialization to prevent NameError in outer scope (CRITICAL FIX) ---
     priority_set, abused_tlds, full_filtered = set(), set(), []
     combined_counter, overlap_counter, domain_sources = Counter(), Counter(), defaultdict(set)
     all_domains_from_sources = defaultdict(set)
