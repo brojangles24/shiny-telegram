@@ -1,10 +1,10 @@
 # 🛡️ Singularity DNS Blocklist Dashboard
-*Generated: 2025-11-25 22:17:43*
+*Generated: 2025-11-25 22:22:21*
 
 ## 🔑 Summary Metrics
 | Metric | Count | Trend |
 | :--- | :--- | :--- |
-| Priority List Count | **300,000** | <span style='color:green;'>`+300000` ⬆️</span> |
+| Priority List Count | **300,000** | <span style='color:gray;'>`+0` ➡️</span> |
 | Total Unique Domains (Pre-filter) | 451,887 | |
 | Domains Excluded by TLD Filter | 60,232 | |
 | Total Filtered Domains (Post-filter) | 391,655 | |
@@ -13,8 +13,8 @@
 ## ⚖️ Scoring Weights
 | Source | Weight | Color |
 | :--- | :---: | :--- |
-| **1HOSTS_LITE** | 1 | <span style='color:#2ca02c;'>███</span> |
-| **HAGEZI_ULTIMATE** | 3 | <span style='color:#d62728;'>███</span> |
+| **1HOSTS_LITE** | 3 | <span style='color:#2ca02c;'>███</span> |
+| **HAGEZI_ULTIMATE** | 4 | <span style='color:#d62728;'>███</span> |
 | **OISD_BIG** | 2 | <span style='color:#1f77b4;'>███</span> |
 | **STEVENBLACK_HOSTS** | 1 | <span style='color:#ff7f0e;'>███</span> |
 
