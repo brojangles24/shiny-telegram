@@ -32,9 +32,8 @@ jobs:
           pip install requests plotly kaleido
           
       - name: Run Blocklist Generation Script
-        # Executes the enhanced Python script
-        # **NOTE: Ensure your file is actually named 'singularity_aggregator.py'**
-        run: python singularity_aggregator.py
+        # ✅ FIXED: Executes the script using its actual filename: singularity_blocklist.py
+        run: python singularity_blocklist.py
         
       - name: Commit and Push Generated Files
         # Automatically detects, stages, and commits all files in the output directory
