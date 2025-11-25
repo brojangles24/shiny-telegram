@@ -21,9 +21,10 @@ OUTPUT_FILENAME_FILTERED = os.path.join(OUTPUT_DIR, "aggregated_noTLD.txt")
 OUTPUT_FILENAME_UNFILTERED = os.path.join(OUTPUT_DIR, "aggregated_withTLD.txt")
 
 HISTORY_FILENAME = os.path.join(OUTPUT_DIR, "history.csv")
-ANALYSIS_FILENAME = os.path.join(OUTPUT_DIR, "overlap_analysis.txt")
+# NEW: Single Markdown file for readable report
+REPORT_FILENAME = os.path.join(OUTPUT_DIR, "metrics_report.md") 
 
-# --- Utility Functions (Omitted for brevity; they remain the same) ---
+# --- Utility Functions (Only changed/new ones shown) ---
 
 def fetch_list(url):
     """Fetches content from a URL, returns a list of lines."""
@@ -77,20 +78,17 @@ def track_history(final_metrics):
         with open(HISTORY_FILENAME, 'r') as f:
             reader = csv.reader(f)
             history = list(reader)
-            # Check if header exists and skip it if it matches
             if history and history[0] == header:
                 history.pop(0)
 
     current_date = datetime.now().strftime('%Y-%m-%d')
     current_final_count = final_metrics['Final_Count']
     
-    # Calculate change from last entry (only for the Final_Count)
     last_count = int(history[-1][1]) if history else 0
     change = current_final_count - last_count
     
     new_entry = [current_date, str(current_final_count), str(change), str(final_metrics['Total_Unfiltered']), str(final_metrics['Excluded_Count']), str(final_metrics['Unique_Count'])]
     
-    # Add individual source counts
     for name in source_names:
         new_entry.append(str(final_metrics['Source_Counts'][name]))
     
@@ -103,56 +101,76 @@ def track_history(final_metrics):
         
     return change
 
-def perform_overlap_analysis(source_sets, domain_appearance_counter, final_list_set, total_unique_unfiltered_count):
-    """Identifies unique domains and top domains appearing across lists."""
+def generate_markdown_report(metrics, domain_appearance_counter, final_list_set, source_sets, change_in_size):
+    """Generates a readable Markdown report with metrics and analysis."""
     
+    report_content = []
+    report_content.append(f"# 🛡️ Blocklist Aggregation Report\n")
+    report_content.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n")
+    report_content.append(f"\n---\n")
+
+    # --- Section 1: Summary Metrics (Table) ---
+    report_content.append(f"## 📊 Run Summary Metrics\n")
+    report_content.append(f"\n| Metric | Count | Change Since Last Run |")
+    report_content.append(f"| :--- | :--- | :--- |")
+    report_content.append(f"| **Final Filtered Count** | {metrics['Final_Count']:,} | **{change_in_size:+}** |")
+    report_content.append(f"| Total Unique Domains (Unfiltered) | {metrics['Total_Unfiltered']:,} | |")
+    report_content.append(f"| Domains Excluded by Spam TLD Filter | {metrics['Excluded_Count']:,} | |")
+    report_content.append(f"| Domains Unique to ONLY One Source | {metrics['Unique_Count']:,} | |\n")
+    
+    # --- Section 2: Source Contribution ---
+    report_content.append(f"\n## 📚 Source List Contribution\n")
+    report_content.append(f"\n| Source List | Initial Count |")
+    report_content.append(f"| :--- | :--- |")
+    for name, count in metrics['Source_Counts'].items():
+        report_content.append(f"| {name.replace('_', ' ')} | {count:,} |")
+    report_content.append(f"\n---\n")
+
+    # --- Section 3: Overlap and Analysis ---
+    
+    # Identify unique and top domains
     unique_domains_only = {domain for domain, count in domain_appearance_counter.items() if count == 1}
-    
-    top_domains = {}
-    
-    for i in range(len(source_sets), 1, -1):
-        top_domains[f'{i}_lists'] = {domain for domain, count in domain_appearance_counter.items() 
-                                     if count == i and domain in final_list_set}
-    
     unique_in_final = {d for d in unique_domains_only if d in final_list_set}
     
-    # Write analysis to a new file
-    with open(ANALYSIS_FILENAME, "w") as f:
-        f.write(f"Overlap Analysis Report - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write("------------------------------------------------------------------\n")
-        f.write(f"Total Unique Domains (All Sources, Before Filter): {total_unique_unfiltered_count:,}\n")
-        
-        f.write(f"\n## Top Domains (Appearing in Multiple Source Lists)\n")
-        f.write(f"NOTE: Only lists domains that made it into the final '{os.path.basename(OUTPUT_FILENAME_FILTERED)}' blocklist.\n\n")
-        
-        for count in range(len(source_sets), 1, -1):
-            key = f'{count}_lists'
-            domain_set = top_domains[key]
-            f.write(f"### Domains in ALL {count} Lists ({len(domain_set):,} domains)\n")
-            for i, domain in enumerate(sorted(list(domain_set))):
-                if i >= 50:
-                    f.write(f"... and {len(domain_set) - 50} more.\n")
-                    break
-                f.write(f"{domain}\n")
-            f.write("\n")
-            
-        f.write(f"\n## Unique Domains (Appearing in ONLY One Source List)\n")
-        f.write(f"Total Unique Domains (in final filtered list): {len(unique_in_final):,}\n")
-        
-        unique_by_source = {}
-        for name, domain_set in source_sets.items():
-            unique_by_source[name] = [d for d in domain_set if domain_appearance_counter[d] == 1 and d in final_list_set]
+    report_content.append(f"## ✨ Overlap Analysis (Top & Unique Domains)\n")
+    report_content.append(f"### Most Common Domains (Appearing in Multiple Source Lists)\n")
+    report_content.append(f"*(Showing up to 50 examples that made it into the final list)*\n")
+    
+    for count in range(len(source_sets), 1, -1):
+        domain_set = {domain for domain, c in domain_appearance_counter.items() 
+                      if c == count and domain in final_list_set}
+        report_content.append(f"\n#### Found in ALL {count} Lists ({len(domain_set):,} domains total)\n")
+        report_content.append("```\n")
+        for i, domain in enumerate(sorted(list(domain_set))):
+            if i >= 50:
+                report_content.append(f"... and {len(domain_set) - 50} more.\n")
+                break
+            report_content.append(f"{domain}\n")
+        report_content.append("```\n")
 
-        for name, unique_list in unique_by_source.items():
-            f.write(f"### Unique to {name} ({len(unique_list):,} domains)\n")
-            for i, domain in enumerate(sorted(unique_list)):
-                if i >= 50:
-                    f.write(f"... and {len(unique_list) - 50} more.\n")
-                    break
-                f.write(f"{domain}\n")
-            f.write("\n")
-            
+    report_content.append(f"\n### Exclusive Contributions (Domains Unique to ONE List)\n")
+    report_content.append(f"Total Unique Domains (in final filtered list): {len(unique_in_final):,}\n")
+
+    # Group unique domains by the list they belong to
+    unique_by_source = {}
+    for name, domain_set in source_sets.items():
+        unique_by_source[name] = [d for d in domain_set if domain_appearance_counter[d] == 1 and d in final_list_set]
+
+    for name, unique_list in unique_by_source.items():
+        report_content.append(f"\n#### Unique to {name.replace('_', ' ')} ({len(unique_list):,} domains)\n")
+        report_content.append("```\n")
+        for i, domain in enumerate(sorted(unique_list)):
+            if i >= 50:
+                report_content.append(f"... and {len(unique_list) - 50} more.\n")
+                break
+            report_content.append(f"{domain}\n")
+        report_content.append("```\n")
+
+    with open(REPORT_FILENAME, "w") as f:
+        f.write("\n".join(report_content))
+
     return len(unique_domains_only)
+
 
 def write_blocklist_file(filename, list_set, source_sets, initial_count, excluded_count, total_unique_count=None, change_in_size=None, is_filtered=True):
     """Writes the blocklist file with an appropriate header."""
@@ -191,10 +209,12 @@ def write_blocklist_file(filename, list_set, source_sets, initial_count, exclude
             f.write(entry + "\n")
 
 
-# --- Main Logic ---
+# --- Main Logic (Only changed/new ones shown) ---
 
 def generate_blocklist():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+    
+    # ... (Steps 1, 2, 3 remain the same: Fetch lists, process, filter) ...
     
     # 1. Fetch and Process Exclusion List
     raw_exclusion_lines = fetch_list(EXCLUSION_URL)
@@ -228,7 +248,6 @@ def generate_blocklist():
         source_sets[name] = current_set
         print(f" -> {name}: {len(current_set):,} entries.")
     
-    # The full list count before TLD filtering
     initial_count = len(combined_domains)
     
     # 3. Filter Combined List (TLD Exclusion)
@@ -244,23 +263,26 @@ def generate_blocklist():
             final_list_set_filtered.add(domain)
 
     final_count_filtered = len(final_list_set_filtered)
-    
-    # 4. Perform Overlap Analysis
-    total_unique_count = perform_overlap_analysis(source_sets, domain_appearance_counter, final_list_set_filtered, initial_count)
-    
-    # 5. Prepare Metrics Dictionary for History Tracking
+
+    # 4. Prepare Metrics Dictionary for History and Report Generation
     metrics = {
         'Final_Count': final_count_filtered,
         'Total_Unfiltered': initial_count,
         'Excluded_Count': excluded_count,
-        'Unique_Count': total_unique_count,
+        'Unique_Count': 0, # Placeholder, updated below
         'Source_Counts': {name: len(s) for name, s in source_sets.items()}
     }
-    
-    # 6. Track History
+
+    # 5. Track History (This calculates change_in_size and updates Unique_Count)
     change_in_size = track_history(metrics)
     
-    # 7. Write Final Lists
+    # The unique count is now extracted from history for the report, but we need the raw count for the report generation itself
+    total_unique_unfiltered_count = len({domain for domain, count in domain_appearance_counter.items() if count == 1})
+    
+    # 6. Generate Markdown Report (uses the updated logic)
+    generate_markdown_report(metrics, domain_appearance_counter, final_list_set_filtered, source_sets, change_in_size)
+    
+    # 7. Write Final Blocklists
     
     # A) Write the UNFILTERED list (Aggregated_list/aggregated_withTLD.txt)
     write_blocklist_file(
@@ -271,12 +293,12 @@ def generate_blocklist():
     # B) Write the FILTERED list (Aggregated_list/aggregated_noTLD.txt)
     write_blocklist_file(
         OUTPUT_FILENAME_FILTERED, final_list_set_filtered, source_sets, 
-        initial_count, excluded_count, total_unique_count, change_in_size, is_filtered=True
+        initial_count, excluded_count, total_unique_unfiltered_count, change_in_size, is_filtered=True
     )
     
-    print(f"\n✅ Successfully created {os.path.basename(OUTPUT_FILENAME_UNFILTERED)} ({initial_count:,} entries).")
-    print(f"✅ Successfully created {os.path.basename(OUTPUT_FILENAME_FILTERED)} ({final_count_filtered:,} entries).")
-    print(f"📊 Central metrics logged to history.csv. Detailed analysis in overlap_analysis.txt.")
+    print(f"\n✅ Successfully created blocklists.")
+    print(f"📊 Central metrics logged to history.csv.")
+    print(f"📄 Detailed report generated: {REPORT_FILENAME}.")
 
 if __name__ == "__main__":
     generate_blocklist()
