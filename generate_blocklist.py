@@ -61,11 +61,7 @@ def extract_tld(domain):
     domain = domain.lstrip('*').lstrip('.').strip()
     if not domain:
         return None
-    # Use split to get the last component, which is treated as the TLD
-    parts = domain.split('.')
-    if len(parts) > 1:
-        return parts[-1]
-    return None # Not a valid TLD if it's just 'localhost' or similar
+    return domain.split('.')[-1]
 
 def track_history(final_metrics):
     """Reads, updates, and writes the list size history, including all counts."""
@@ -103,7 +99,7 @@ def track_history(final_metrics):
         
     return change
 
-def generate_markdown_report(metrics, domain_appearance_counter, final_list_set, source_sets, change_in_size):
+def generate_markdown_report(metrics, domain_appearance_counter, final_list_set, source_sets, change_in_size, excluded_tld_counter):
     """Generates a readable Markdown report with metrics and analysis."""
     
     report_content = []
@@ -128,22 +124,18 @@ def generate_markdown_report(metrics, domain_appearance_counter, final_list_set,
         report_content.append(f"| {name.replace('_', ' ')} | {count:,} |")
     report_content.append(f"\n---\n")
 
-    # --- NEW SECTION: Top 50 TLDs ---
-    report_content.append(f"## 🌐 Top 50 TLDs in Final Blocklist\n")
-    report_content.append(f"This shows the Top 50 Top-Level Domains (TLDs) found in the final filtered `aggregated_noTLD.txt` list.\n")
+    # --- NEW: Section 3: Excluded TLDs ---
+    report_content.append(f"## 🚫 Top 50 Excluded Spam TLDs\n")
+    report_content.append(f"*(Based on domains removed from the 'aggregated_noTLD.txt' list)*\n")
+    report_content.append(f"\n| Rank | TLD | Exclusion Count |")
+    report_content.append(f"| :--- | :--- | :--- |")
     
-    tld_counter = Counter()
-    for domain in final_list_set: # final_list_set is the filtered set
-        tld = extract_tld(domain)
-        if tld:
-            tld_counter[tld] += 1
+    # Get the top 50 most common excluded TLDs
+    top_50_excluded = excluded_tld_counter.most_common(50)
     
-    report_content.append("```\n")
-    report_content.append(f"{'TLD':<15} | {'Count':<10}\n")
-    report_content.append(f"{'-'*15} | {'-'*10}\n")
-    for tld, count in tld_counter.most_common(50):
-        report_content.append(f"{tld:<15} | {count:<10,}\n")
-    report_content.append("```\n")
+    for i, (tld, count) in enumerate(top_50_excluded):
+        report_content.append(f"| {i+1} | `.{tld}` | {count:,} |")
+    
     report_content.append(f"\n---\n")
 
     # --- Section 4: Overlap and Analysis ---
@@ -186,12 +178,13 @@ def generate_markdown_report(metrics, domain_appearance_counter, final_list_set,
             report_content.append(f"{domain}\n")
         report_content.append("```\n")
 
-    # *** Use explicit UTF-8 encoding for reliable writing ***
+    # *** FIX: Using explicit UTF-8 encoding for reliable writing ***
     try:
         with open(REPORT_FILENAME, "w", encoding='utf-8') as f:
             f.write("\n".join(report_content))
     except Exception as e:
         print(f"FATAL ERROR writing Markdown report: {e}", file=sys.stderr)
+        # We allow the script to continue to write the other critical files
 
     return len(unique_domains_only)
 
@@ -201,7 +194,7 @@ def write_blocklist_file(filename, list_set, source_sets, initial_count, exclude
     sorted_list = sorted(list(list_set))
     final_count = len(sorted_list)
     
-    # Use explicit UTF-8 encoding for blocklists
+    # Use explicit UTF-8 encoding for blocklists as well
     with open(filename, "w", encoding='utf-8') as f:
         f.write("# Blocklist Aggregation Report\n")
         f.write(f"# Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -276,12 +269,14 @@ def generate_blocklist():
     # 3. Filter Combined List (TLD Exclusion)
     final_list_set_filtered = set()
     excluded_count = 0
+    excluded_tld_counter = Counter() # <-- NEW: Initialize TLD counter
     
     for domain in combined_domains:
         domain_tld = extract_tld(domain)
         
         if domain_tld in exclude_tlds:
             excluded_count += 1
+            excluded_tld_counter[domain_tld] += 1 # <-- NEW: Track the TLD
         else:
             final_list_set_filtered.add(domain)
 
@@ -302,7 +297,8 @@ def generate_blocklist():
     change_in_size = track_history(metrics)
     
     # 6. Generate Markdown Report
-    generate_markdown_report(metrics, domain_appearance_counter, final_list_set_filtered, source_sets, change_in_size)
+    #    NEW: Pass the excluded_tld_counter to the function
+    generate_markdown_report(metrics, domain_appearance_counter, final_list_set_filtered, source_sets, change_in_size, excluded_tld_counter)
     
     # 7. Write Final Blocklists
     
