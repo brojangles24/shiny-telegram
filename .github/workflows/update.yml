@@ -1,9 +1,9 @@
 name: Generate and Update Blocklist
 
 on:
-  # Run daily at 00:00 UTC (midnight)
+  # 🎯 FIX: Run daily at 00:00 UTC (midnight)
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 0 * * *'
   # Allows manual triggering via the GitHub UI
   workflow_dispatch:
 
@@ -13,39 +13,41 @@ jobs:
     # Grant the GITHUB_TOKEN write permission for this job to push changes
     permissions:
       contents: write 
+      
     steps:
       - name: Checkout Repository
         # Downloads your repository code
         uses: actions/checkout@v4
         
       - name: Set up Python
-        # Configures Python environment
+        # Use Python 3.12 for latest features and security
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
-      
-      - name: Install dependencies
-        # Installs the 'requests' library and matplotlib for plotting
+          python-version: '3.12'
+          
+      - name: Install dependencies (requests, Plotly, Kaleido)
+        # 🎯 FIX: Installs all required libraries including Plotly and Kaleido for image export
         run: |
           pip install --upgrade pip
-          pip install requests matplotlib
-        
-      - name: Run Blocklist Generation Script
-        # Executes your custom Python script (generate_blocklist.py)
-        run: python singularity_blocklist.py
-      
-      - name: Stage All Generated Files
-        # *** THIS IS THE CRUCIAL MISSING STEP ***
-        # Manually ensures all files in the Aggregated_list folder are staged
-        run: |
-          git config --global user.name "GitHub Action Bot"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Aggregated_list
+          pip install requests plotly kaleido
           
-      - name: Commit and Push Changes
-        # Commits the staged files and pushes to the repository
+      - name: Run Blocklist Generation Script
+        # Executes your custom Python script (singularity_blocklist.py)
+        # Using the script name provided in the previous step
+        run: python singularity_aggregator.py
+        
+      # 🚀 IMPROVEMENT: Use git-auto-commit-action to handle both staging and committing
+      # The previous manual git config/add step is no longer needed.
+      - name: Commit and Push Generated Files
+        # This action automatically detects, stages, and commits/pushes files 
+        # created in the Aggregated_list/ directory.
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "🤖 Update combined blocklist and metrics report"
-          # We no longer need a complex file_pattern because we staged the whole folder
-          skip_dirty_check: false
+          # Specify the exact folder to check for changes
+          file_pattern: Aggregated_list/
+          # Set the bot's name/email explicitly (good practice, though often defaults are fine)
+          commit_user_name: "Singularity Bot"
+          commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+          # Use a different branch to commit to, e.g., 'gh-pages' for publishing the HTML dashboard
+          # branch: ${{ github.ref_name }} # Defaults to the current branch (e.g., 'main')
