@@ -21,10 +21,9 @@ OUTPUT_FILENAME_FILTERED = os.path.join(OUTPUT_DIR, "aggregated_noTLD.txt")
 OUTPUT_FILENAME_UNFILTERED = os.path.join(OUTPUT_DIR, "aggregated_withTLD.txt")
 
 HISTORY_FILENAME = os.path.join(OUTPUT_DIR, "history.csv")
-# NEW: Single Markdown file for readable report
 REPORT_FILENAME = os.path.join(OUTPUT_DIR, "metrics_report.md") 
 
-# --- Utility Functions (Only changed/new ones shown) ---
+# --- Utility Functions ---
 
 def fetch_list(url):
     """Fetches content from a URL, returns a list of lines."""
@@ -166,6 +165,7 @@ def generate_markdown_report(metrics, domain_appearance_counter, final_list_set,
             report_content.append(f"{domain}\n")
         report_content.append("```\n")
 
+    # *** THIS IS THE CRITICAL FILE WRITING STEP ***
     with open(REPORT_FILENAME, "w") as f:
         f.write("\n".join(report_content))
 
@@ -209,12 +209,10 @@ def write_blocklist_file(filename, list_set, source_sets, initial_count, exclude
             f.write(entry + "\n")
 
 
-# --- Main Logic (Only changed/new ones shown) ---
+# --- Main Logic ---
 
 def generate_blocklist():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    
-    # ... (Steps 1, 2, 3 remain the same: Fetch lists, process, filter) ...
     
     # 1. Fetch and Process Exclusion List
     raw_exclusion_lines = fetch_list(EXCLUSION_URL)
@@ -265,21 +263,20 @@ def generate_blocklist():
     final_count_filtered = len(final_list_set_filtered)
 
     # 4. Prepare Metrics Dictionary for History and Report Generation
+    total_unique_unfiltered_count = len({domain for domain, count in domain_appearance_counter.items() if count == 1})
+    
     metrics = {
         'Final_Count': final_count_filtered,
         'Total_Unfiltered': initial_count,
         'Excluded_Count': excluded_count,
-        'Unique_Count': 0, # Placeholder, updated below
+        'Unique_Count': total_unique_unfiltered_count,
         'Source_Counts': {name: len(s) for name, s in source_sets.items()}
     }
-
-    # 5. Track History (This calculates change_in_size and updates Unique_Count)
+    
+    # 5. Track History (This calculates change_in_size and updates history.csv)
     change_in_size = track_history(metrics)
     
-    # The unique count is now extracted from history for the report, but we need the raw count for the report generation itself
-    total_unique_unfiltered_count = len({domain for domain, count in domain_appearance_counter.items() if count == 1})
-    
-    # 6. Generate Markdown Report (uses the updated logic)
+    # 6. Generate Markdown Report
     generate_markdown_report(metrics, domain_appearance_counter, final_list_set_filtered, source_sets, change_in_size)
     
     # 7. Write Final Blocklists
