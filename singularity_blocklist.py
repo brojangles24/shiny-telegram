@@ -25,8 +25,9 @@ import plotly.io as pio
 
 # --- Configuration & Constants ---
 
-# Regular expression for robust domain validation (e.g., example.com, sub.domain.co.uk)
-# Ensures valid characters, length, and structure.
+# Regular expression for robust domain validation. 
+# Ensures valid characters, length (max 253), and structure (requires at least one dot).
+# 
 DOMAIN_REGEX = re.compile(
     r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
 )
@@ -156,7 +157,6 @@ def process_domain(line: str) -> Optional[str]:
         return None
     
     parts = line.split()
-    # Logic for hosts file (0.0.0.0 domain) or simple domain list
     domain = parts[1] if len(parts) > 1 and parts[0] in ("0.0.0.0", "127.0.0.1") else parts[0] if len(parts) == 1 else None
     
     if not domain: return None
@@ -167,7 +167,7 @@ def process_domain(line: str) -> Optional[str]:
     if domain in ("localhost", "localhost.localdomain", "::1", "255.255.255.255", "wpad"):
         return None
     
-    # 2. **STRICT REGEX VALIDATION** (Requires at least one dot and valid structure)
+    # 2. **STRICT REGEX VALIDATION**
     if not DOMAIN_REGEX.match(domain):
         return None
     
@@ -452,7 +452,7 @@ def generate_markdown_report(
         in_priority = source_metrics.get(name, {}).get("In_Priority_List", 0)
         unique_count = source_metrics.get(name, {}).get("Unique_to_Source", 0)
         
-        total_in_filtered_from_source = sum(1 for d in full_filtered_list if d in overlap_counter and name in domain_sources.get(d, set()))
+        total_in_filtered_from_source = sum(1 for d in full_filtered_list if name in domain_sources.get(d, set()))
         percent_contributed = f"{(in_priority / total_in_filtered_from_source * 100):.1f}%" if total_in_filtered_from_source > 0 else "0.0%"
         color = SOURCE_COLORS.get(name, "black")
         
@@ -549,7 +549,7 @@ def main():
     
     # Final check: Inform user about required dependency file (best practice)
     if not Path("requirements.txt").exists():
-        logger.info("💡 Recommendation: Create a 'requirements.txt' file for dependency management.")
+        logger.info("💡 Recommendation: Create a 'requirements.txt' file for dependency management and stability.")
         
     try:
         history_path = output_path / HISTORY_FILENAME
