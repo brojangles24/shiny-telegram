@@ -1,5 +1,5 @@
 # Blocklist Aggregation Report
-# Generated on: 2025-11-25 17:15:54
+# Generated on: 2025-11-25 17:21:41
 # ------------------------------------------------------------------
 # TYPE: Filtered List (Spam TLDs REMOVED) - aggregated_noTLD.txt
 # ------------------------------------------------------------------
@@ -14,7 +14,7 @@
 #   - Domains excluded by Spam TLD filter: 308,666
 #   - Domains unique to ONLY one source list (unfiltered): 315,957
 #   - FINAL FILTERED COUNT: 143,095
-#   - Size change since last run: -60106
+#   - Size change since last run: +0
 
 0--0.info
 0--foodwarez.da.ru

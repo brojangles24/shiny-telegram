@@ -1,6 +1,6 @@
 # 🛡️ Blocklist Aggregation Report
 
-*Generated: 2025-11-25 17:15:54*
+*Generated: 2025-11-25 17:21:40*
 
 
 ---
@@ -10,7 +10,7 @@
 
 | Metric | Count | Change Since Last Run |
 | :--- | :--- | :--- |
-| **Final Filtered Count** | 143,095 | **-60106** |
+| **Final Filtered Count** | 143,095 | **+0** |
 | Total Unique Domains (Unfiltered) | 451,761 | |
 | Domains Excluded by Spam TLD Filter | 308,666 | |
 | Domains Unique to ONLY One Source | 315,957 | |
