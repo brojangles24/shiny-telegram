@@ -34,7 +34,10 @@ BLOCKLIST_SOURCES: Dict[str, str] = {
     "HAGEZI_ULTIMATE": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/ultimate-onlydomains.txt",
     "OISD_BIG": "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_big.txt",
     "1HOSTS_LITE": "https://raw.githubusercontent.com/badmojr/1Hosts/refs/heads/master/Lite/domains.wildcards",
-    "STEVENBLACK_HOSTS": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
+    "STEVENBLACK_HOSTS": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+    "ANUDEEP_ADSERVERS": "https://raw.githubusercontent.com/anudeepND/blacklist/master/adservers.txt",
+    "ADAWAY_HOSTS": "https://adaway.org/hosts.txt",
+    "ADGUARD_DNS": "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt"
 }
 HAGEZI_ABUSED_TLDS: str = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/spam-tlds-onlydomains.txt"
 
@@ -52,11 +55,15 @@ CACHE_FILE = OUTPUT_DIR / "fetch_cache.json"
 # Scoring and style
 PRIORITY_CAP = 300_000
 
-# CUSTOM WEIGHTS: Hagezi=4, 1Hosts=3, OISD=2, StevenBlack=1
+# CUSTOM WEIGHTS: 
 SOURCE_WEIGHTS: Dict[str, int] = {
-    "HAGEZI_ULTIMATE": 4,
-    "1HOSTS_LITE": 3,
-    "OISD_BIG": 2, 
+    # Core Security/High-Trust (No Change)
+    "HAGEZI_ULTIMATE": 4,  
+    "1HOSTS_LITE": 3,      
+    "OISD_BIG": 2,         
+    "ADGUARD_DNS": 3,        # High quality, modern tracking filter
+    "ANUDEEP_ADSERVERS": 2,  # Excellent, dedicated ad/malware source
+    "ADAWAY_HOSTS": 2,       # Well-known, stable ad-blocking list
     "STEVENBLACK_HOSTS": 1
 }
 MAX_SCORE = sum(SOURCE_WEIGHTS.values())
