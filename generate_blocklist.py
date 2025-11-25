@@ -1,330 +1,315 @@
+#!/usr/bin/env python3
+"""
+Improved Blocklist Aggregator
+Features:
+- concurrent fetches with retries
+- argparse for runtime options (workers, max output, verbose, skip-history)
+- stricter hosts/hosts-like parsing and wildcard handling
+- robust history CSV handling
+- UTF-8 safe outputs and markdown report
+"""
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+import argparse
 import sys
 import os
 import csv
 from datetime import datetime
-from collections import Counter
+from collections import Counter, defaultdict
+import re
 
-# --- Configuration ---
-
+# --- Default Configuration (can be overridden via CLI) ---
 BLOCKLIST_SOURCES = {
     "OISD_WILD": "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_big.txt",
     "HAGEZI_ULTIMATE": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/ultimate-onlydomains.txt",
     "1HOSTS_LITE": "https://raw.githubusercontent.com/badmojr/1Hosts/refs/heads/master/Lite/domains.wildcards",
     "STEVENBLACK_HOSTS": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
 }
-
 EXCLUSION_URL = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/spam-tlds-onlydomains.txt"
-
 OUTPUT_DIR = "Aggregated_list"
 OUTPUT_FILENAME_FILTERED = os.path.join(OUTPUT_DIR, "aggregated_noTLD.txt")
 OUTPUT_FILENAME_UNFILTERED = os.path.join(OUTPUT_DIR, "aggregated_withTLD.txt")
-
 HISTORY_FILENAME = os.path.join(OUTPUT_DIR, "history.csv")
-REPORT_FILENAME = os.path.join(OUTPUT_DIR, "metrics_report.md") 
+REPORT_FILENAME = os.path.join(OUTPUT_DIR, "metrics_report.md")
 
-# --- Utility Functions ---
+HOSTS_LINE_RE = re.compile(r'^(?:0\.0\.0\.0|127\.0\.0\.1|::1)\s+(.+)$')
+DOMAIN_CLEAN_RE = re.compile(r'^[\*\.\w\-]+\.[\w\-]+$')  # simple sanity check (has at least one dot)
 
-def fetch_list(url):
-    """Fetches content from a URL, returns a list of lines."""
-    print(f"Fetching: {url}")
+# --- Utilities ---
+def make_session(total_retries=3, backoff_factor=0.3, status_forcelist=(429, 500, 502, 503, 504)):
+    s = requests.Session()
+    retries = Retry(total=total_retries, backoff_factor=backoff_factor,
+                    status_forcelist=status_forcelist, allowed_methods=frozenset(['GET','HEAD']))
+    adapter = HTTPAdapter(max_retries=retries)
+    s.mount("http://", adapter)
+    s.mount("https://", adapter)
+    s.headers.update({"User-Agent": "Blocklist-Aggregator/1.0"})
+    return s
+
+def fetch_text(session, url, timeout=30):
     try:
-        response = requests.get(url, timeout=45) 
-        response.raise_for_status()
-        return response.text.splitlines()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching {url}: {e}", file=sys.stderr)
+        r = session.get(url, timeout=timeout)
+        r.raise_for_status()
+        return r.text.splitlines()
+    except Exception as e:
         return []
 
-def process_line(line):
-    """Cleans a single line: removes comments, extracts domain from hosts format."""
-    line = line.strip().lower()
-    
-    if not line or line.startswith(('#', '!')):
+def parse_domain_from_line(line):
+    """Return cleaned domain or None."""
+    if not line:
         return None
-        
+    line = line.strip()
+    if not line:
+        return None
+    # drop inline comments
+    if '#' in line:
+        line = line.split('#',1)[0].strip()
     parts = line.split()
-    if len(parts) > 1 and parts[0] in ('0.0.0.0', '127.0.0.1'):
-        domain = parts[1]
+    # hosts format
+    m = HOSTS_LINE_RE.match(line)
+    if m:
+        domain = m.group(1).strip()
     elif len(parts) == 1:
-        domain = parts[0]
+        domain = parts[0].strip()
+    elif len(parts) > 1 and parts[0] in ('0.0.0.0', '127.0.0.1', '::1'):
+        domain = parts[1].strip()
     else:
         return None
-        
-    if domain in ('localhost', '::1', '255.255.255.255'):
+
+    # normalize
+    domain = domain.lower().lstrip('*.').lstrip('.')
+    if domain in ('localhost', '', '::1', '255.255.255.255'):
         return None
-        
-    return domain.strip()
+    # skip entries that are single-label (no dot)
+    if '.' not in domain:
+        return None
+    # sanity: remove stray characters
+    domain = re.sub(r'[^a-z0-9\.\-]', '', domain)
+    if not DOMAIN_CLEAN_RE.match(domain):
+        return None
+    return domain
 
 def extract_tld(domain):
-    """Extracts the 'TLD' component (the last segment after the final dot) for filtering."""
-    domain = domain.lstrip('*').lstrip('.').strip()
-    if not domain:
+    d = domain.lstrip('*.').lstrip('.').strip()
+    if not d or '.' not in d:
         return None
-    return domain.split('.')[-1]
+    return d.rsplit('.',1)[-1]
 
-def track_history(final_metrics):
-    """Reads, updates, and writes the list size history, including all counts."""
-    
-    source_names = list(BLOCKLIST_SOURCES.keys())
-    
-    header = ['Date', 'Final_Count', 'Change', 'Total_Unfiltered', 'Excluded_Count', 'Unique_Count'] + [f'Source_{name}' for name in source_names]
-    
-    history = []
-    
-    if os.path.exists(HISTORY_FILENAME):
-        with open(HISTORY_FILENAME, 'r') as f:
+def safe_read_history(path):
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, 'r', newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
-            history = list(reader)
-            if history and history[0] == header:
-                history.pop(0)
+            rows = list(reader)
+            return rows
+    except Exception:
+        return []
 
-    current_date = datetime.now().strftime('%Y-%m-%d')
-    current_final_count = final_metrics['Final_Count']
-    
-    last_count = int(history[-1][1]) if history else 0
-    change = current_final_count - last_count
-    
-    new_entry = [current_date, str(current_final_count), str(change), str(final_metrics['Total_Unfiltered']), str(final_metrics['Excluded_Count']), str(final_metrics['Unique_Count'])]
-    
-    for name in source_names:
-        new_entry.append(str(final_metrics['Source_Counts'][name]))
-    
-    history.append(new_entry)
-
-    with open(HISTORY_FILENAME, 'w', newline='') as f:
+def safe_write_history(path, header, rows):
+    with open(path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(header)
-        writer.writerows(history)
-        
-    return change
+        writer.writerows(rows)
 
-def generate_markdown_report(metrics, domain_appearance_counter, final_list_set, source_sets, change_in_size, excluded_tld_counter):
-    """Generates a readable Markdown report with metrics and analysis."""
-    
-    report_content = []
-    report_content.append(f"# 🛡️ Blocklist Aggregation Report\n")
-    report_content.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n")
-    report_content.append(f"\n---\n")
+# --- Core functions ---
+def fetch_all_sources(sources, session, workers=6, verbose=False):
+    results = {}
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futures = {ex.submit(fetch_text, session, url): name for name,url in sources.items()}
+        for fut in as_completed(futures):
+            name = futures[fut]
+            lines = fut.result()
+            parsed = set()
+            for line in lines:
+                d = parse_domain_from_line(line)
+                if d:
+                    parsed.add(d)
+            results[name] = parsed
+            if verbose:
+                print(f"Fetched {name}: {len(parsed):,}")
+    return results
 
-    # --- Section 1: Summary Metrics (Table) ---
-    report_content.append(f"## 📊 Run Summary Metrics\n")
-    report_content.append(f"\n| Metric | Count | Change Since Last Run |")
-    report_content.append(f"| :--- | :--- | :--- |")
-    report_content.append(f"| **Final Filtered Count** | {metrics['Final_Count']:,} | **{change_in_size:+}** |")
-    report_content.append(f"| Total Unique Domains (Unfiltered) | {metrics['Total_Unfiltered']:,} | |")
-    report_content.append(f"| Domains Excluded by Spam TLD Filter | {metrics['Excluded_Count']:,} | |")
-    report_content.append(f"| Domains Unique to ONLY One Source | {metrics['Unique_Count']:,} | |\n")
-    
-    # --- Section 2: Source Contribution ---
-    report_content.append(f"\n## 📚 Source List Contribution\n")
-    report_content.append(f"\n| Source List | Initial Count |")
-    report_content.append(f"| :--- | :--- |")
-    for name, count in metrics['Source_Counts'].items():
-        report_content.append(f"| {name.replace('_', ' ')} | {count:,} |")
-    report_content.append(f"\n---\n")
+def fetch_exclude_tlds(excl_url, session, verbose=False):
+    lines = fetch_text(session, excl_url)
+    tlds = set()
+    for line in lines:
+        d = parse_domain_from_line(line)
+        if d:
+            t = extract_tld(d)
+            if t:
+                tlds.add(t)
+    if verbose:
+        print(f"Excluded TLDs: {len(tlds)}")
+    return tlds
 
-    # --- NEW: Section 3: Excluded TLDs ---
-    report_content.append(f"## 🚫 Top 50 Excluded Spam TLDs\n")
-    report_content.append(f"*(Based on domains removed from the 'aggregated_noTLD.txt' list)*\n")
-    report_content.append(f"\n| Rank | TLD | Exclusion Count |")
-    report_content.append(f"| :--- | :--- | :--- |")
-    
-    # Get the top 50 most common excluded TLDs
-    top_50_excluded = excluded_tld_counter.most_common(50)
-    
-    for i, (tld, count) in enumerate(top_50_excluded):
-        report_content.append(f"| {i+1} | `.{tld}` | {count:,} |")
-    
-    report_content.append(f"\n---\n")
-
-    # --- Section 4: Overlap and Analysis ---
-    
-    # Identify unique and top domains
-    unique_domains_only = {domain for domain, count in domain_appearance_counter.items() if count == 1}
-    unique_in_final = {d for d in unique_domains_only if d in final_list_set}
-    
-    report_content.append(f"## ✨ Overlap Analysis (Top & Unique Domains)\n")
-    report_content.append(f"### Most Common Domains (Appearing in Multiple Source Lists)\n")
-    report_content.append(f"*(Showing up to 50 examples that made it into the final list)*\n")
-    
-    for count in range(len(source_sets), 1, -1):
-        domain_set = {domain for domain, c in domain_appearance_counter.items() 
-                      if c == count and domain in final_list_set}
-        report_content.append(f"\n#### Found in ALL {count} Lists ({len(domain_set):,} domains total)\n")
-        report_content.append("```\n")
-        for i, domain in enumerate(sorted(list(domain_set))):
-            if i >= 50:
-                report_content.append(f"... and {len(domain_set) - 50} more.\n")
-                break
-            report_content.append(f"{domain}\n")
-        report_content.append("```\n")
-
-    report_content.append(f"\n### Exclusive Contributions (Domains Unique to ONE List)\n")
-    report_content.append(f"Total Unique Domains (in final filtered list): {len(unique_in_final):,}\n")
-
-    # Group unique domains by the list they belong to
-    unique_by_source = {}
-    for name, domain_set in source_sets.items():
-        unique_by_source[name] = [d for d in domain_set if domain_appearance_counter[d] == 1 and d in final_list_set]
-
-    for name, unique_list in unique_by_source.items():
-        report_content.append(f"\n#### Unique to {name.replace('_', ' ')} ({len(unique_list):,} domains)\n")
-        report_content.append("```\n")
-        for i, domain in enumerate(sorted(unique_list)):
-            if i >= 50:
-                report_content.append(f"... and {len(unique_list) - 50} more.\n")
-                break
-            report_content.append(f"{domain}\n")
-        report_content.append("```\n")
-
-    # *** FIX: Using explicit UTF-8 encoding for reliable writing ***
-    try:
-        with open(REPORT_FILENAME, "w", encoding='utf-8') as f:
-            f.write("\n".join(report_content))
-    except Exception as e:
-        print(f"FATAL ERROR writing Markdown report: {e}", file=sys.stderr)
-        # We allow the script to continue to write the other critical files
-
-    return len(unique_domains_only)
-
-
-def write_blocklist_file(filename, list_set, source_sets, initial_count, excluded_count, total_unique_count=None, change_in_size=None, is_filtered=True):
-    """Writes the blocklist file with an appropriate header."""
-    sorted_list = sorted(list(list_set))
-    final_count = len(sorted_list)
-    
-    # Use explicit UTF-8 encoding for blocklists as well
-    with open(filename, "w", encoding='utf-8') as f:
+def write_blocklist_file(filename, domains, source_sets, metrics_header_lines=None, is_filtered=True):
+    sorted_list = sorted(domains)
+    os.makedirs(os.path.dirname(filename) or '.', exist_ok=True)
+    with open(filename, 'w', encoding='utf-8') as f:
         f.write("# Blocklist Aggregation Report\n")
         f.write(f"# Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write("# ------------------------------------------------------------------\n")
-        
         if is_filtered:
             f.write(f"# TYPE: Filtered List (Spam TLDs REMOVED) - {os.path.basename(filename)}\n")
         else:
             f.write(f"# TYPE: Unfiltered List (Contains ALL unique domains) - {os.path.basename(filename)}\n")
-            
         f.write("# ------------------------------------------------------------------\n")
-        
-        f.write(f"# INITIAL SOURCES COUNT:\n")
-        for name, domain_set in source_sets.items():
-             f.write(f"#   - {name}: {len(domain_set):,}\n")
-        f.write("# ------------------------------------------------------------------\n")
-        
-        if is_filtered:
-            f.write(f"# FILTERED METRICS:\n")
-            f.write(f"#   - Total unique domains before filtering: {initial_count:,}\n")
-            f.write(f"#   - Domains excluded by Spam TLD filter: {excluded_count:,}\n")
-            f.write(f"#   - Domains unique to ONLY one source list (unfiltered): {total_unique_count:,}\n")
-            f.write(f"#   - FINAL FILTERED COUNT: {final_count:,}\n")
-            f.write(f"#   - Size change since last run: {change_in_size:+}\n\n")
-        else:
-            f.write(f"# UNFILTERED METRICS:\n")
-            f.write(f"#   - FINAL UNFILTERED COUNT: {final_count:,}\n\n")
-
+        if metrics_header_lines:
+            for ln in metrics_header_lines:
+                f.write(f"# {ln}\n")
+            f.write("# ------------------------------------------------------------------\n")
         for entry in sorted_list:
             f.write(entry + "\n")
 
+def generate_markdown_report(path, metrics, top_excluded_tlds, unique_by_source, appearance_counter, final_list_set, source_count):
+    lines = []
+    lines.append(f"# Blocklist Aggregation Report")
+    lines.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n")
+    lines.append("## Summary\n")
+    lines.append(f"- Final Filtered Count: {metrics['Final_Count']:,}")
+    lines.append(f"- Total Unfiltered Unique: {metrics['Total_Unfiltered']:,}")
+    lines.append(f"- Excluded Count: {metrics['Excluded_Count']:,}")
+    lines.append(f"- Unique to one source (unfiltered): {metrics['Unique_Count']:,}\n")
+    lines.append("## Source Contributions\n")
+    for k,v in metrics['Source_Counts'].items():
+        lines.append(f"- {k}: {v:,}")
+    lines.append("\n## Top Excluded TLDs\n")
+    lines.append("| Rank | TLD | Count |")
+    lines.append("| --- | --- | --- |")
+    for i,(t,c) in enumerate(top_excluded_tlds):
+        if i>=50: break
+        lines.append(f"| {i+1} | .{t} | {c:,} |")
 
-# --- Main Logic ---
+    lines.append("\n## Example Overlap (domains appearing in multiple lists)\n")
+    # show handful from highest overlap down to 2
+    for overlap in range(source_count, 1, -1):
+        bucket = [d for d,cnt in appearance_counter.items() if cnt==overlap and d in final_list_set]
+        if not bucket: continue
+        lines.append(f"### Present in {overlap} lists ({len(bucket):,})")
+        for d in sorted(bucket)[:50]:
+            lines.append(f"- {d}")
+        if len(bucket)>50:
+            lines.append(f"- ... and {len(bucket)-50:,} more\n")
 
-def generate_blocklist():
+    lines.append("\n## Unique domains per source (examples)\n")
+    for src, lst in unique_by_source.items():
+        lines.append(f"### {src} ({len(lst):,})")
+        for d in sorted(lst)[:50]:
+            lines.append(f"- {d}")
+        if len(lst)>50:
+            lines.append(f"- ... and {len(lst)-50:,} more\n")
+
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write("\n".join(lines))
+
+# --- CLI entrypoint ---
+def main(argv=None):
+    p = argparse.ArgumentParser(description="Aggregate and filter domain blocklists.")
+    p.add_argument("--workers", type=int, default=6)
+    p.add_argument("--max-output", type=int, default=0, help="Cap final output to N domains (0 = no cap).")
+    p.add_argument("--skip-history", action="store_true")
+    p.add_argument("--verbose", action="store_true")
+    p.add_argument("--no-exclusion", action="store_true", help="Skip TLD exclusion fetch and filtering.")
+    args = p.parse_args(argv)
+
+    session = make_session()
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    
-    # 1. Fetch and Process Exclusion List
-    raw_exclusion_lines = fetch_list(EXCLUSION_URL)
+
+    # fetch exclusion list
     exclude_tlds = set()
-    for line in raw_exclusion_lines:
-        domain = process_line(line)
-        if domain:
-            tld_segment = extract_tld(domain)
-            if tld_segment:
-                exclude_tlds.add(tld_segment)
-    
-    print(f"\nIdentified {len(exclude_tlds)} TLDs for exclusion.")
-    
-    # ------------------- DEBUG LINE -------------------
-    # This will print the first 20 TLDs that the script thinks it should exclude.
-    # We expect to see ['zip', 'mov', 'link', ...]
-    # If you see ['com', 'org', 'net', ...], your EXCLUSION_URL variable is WRONG.
-    print(f"DEBUG: First 20 TLDs to exclude: {sorted(list(exclude_tlds))[:20]}")
-    # ----------------- END DEBUG LINE -----------------
-    
+    if not args.no_exclusion:
+        exclude_tlds = fetch_exclude_tlds(EXCLUSION_URL, session, verbose=args.verbose)
 
-    # 2. Fetch and Process All Blocklists Separately and Count Overlap
-    source_sets = {}
-    combined_domains = set()
-    domain_appearance_counter = Counter()
+    # fetch sources concurrently
+    source_sets = fetch_all_sources(BLOCKLIST_SOURCES, session, workers=args.workers, verbose=args.verbose)
 
-    for name, url in BLOCKLIST_SOURCES.items():
-        raw_lines = fetch_list(url)
-        current_set = set()
-        for line in raw_lines:
-            domain = process_line(line)
-            if domain:
-                current_set.add(domain)
-                
-        for domain in current_set:
-            combined_domains.add(domain) 
-            domain_appearance_counter[domain] += 1
-                
-        source_sets[name] = current_set
-        print(f" -> {name}: {len(current_set):,} entries.")
-    
-    initial_count = len(combined_domains)
-    
-    # 3. Filter Combined List (TLD Exclusion)
-    final_list_set_filtered = set()
-    excluded_count = 0
-    excluded_tld_counter = Counter() # <-- NEW: Initialize TLD counter
-    
-    for domain in combined_domains:
-        domain_tld = extract_tld(domain)
-        
-        if domain_tld in exclude_tlds:
-            excluded_count += 1
-            excluded_tld_counter[domain_tld] += 1 # <-- NEW: Track the TLD
+    # combine and count appearances
+    combined = set()
+    appearance = Counter()
+    for name, s in source_sets.items():
+        for d in s:
+            combined.add(d)
+            appearance[d] += 1
+
+    initial_count = len(combined)
+
+    # filter by exclude_tlds
+    excluded_counter = Counter()
+    final_filtered = set()
+    for d in combined:
+        t = extract_tld(d)
+        if t and t in exclude_tlds:
+            excluded_counter[t] += 1
         else:
-            final_list_set_filtered.add(domain)
+            final_filtered.add(d)
 
-    final_count_filtered = len(final_list_set_filtered)
+    # optional cap
+    if args.max_output and args.max_output > 0 and len(final_filtered) > args.max_output:
+        # deterministic truncation: sort by frequency (higher first), then lexicographically
+        ranked = sorted(final_filtered, key=lambda x: (-appearance[x], x))
+        final_filtered = set(ranked[:args.max_output])
+        if args.verbose:
+            print(f"Applied cap: final list truncated to {len(final_filtered):,} entries")
 
-    # 4. Prepare Metrics Dictionary for History and Report Generation
-    total_unique_unfiltered_count = len({domain for domain, count in domain_appearance_counter.items() if count == 1})
-    
+    # metrics
+    total_unique_unfiltered = sum(1 for d,c in appearance.items() if c==1)
     metrics = {
-        'Final_Count': final_count_filtered,
+        'Final_Count': len(final_filtered),
         'Total_Unfiltered': initial_count,
-        'Excluded_Count': excluded_count,
-        'Unique_Count': total_unique_unfiltered_count,
-        'Source_Counts': {name: len(s) for name, s in source_sets.items()}
+        'Excluded_Count': sum(excluded_counter.values()),
+        'Unique_Count': total_unique_unfiltered,
+        'Source_Counts': {k: len(v) for k,v in source_sets.items()}
     }
-    
-    # 5. Track History (This calculates change_in_size and updates history.csv)
-    change_in_size = track_history(metrics)
-    
-    # 6. Generate Markdown Report
-    #    NEW: Pass the excluded_tld_counter to the function
-    generate_markdown_report(metrics, domain_appearance_counter, final_list_set_filtered, source_sets, change_in_size, excluded_tld_counter)
-    
-    # 7. Write Final Blocklists
-    
-    # A) Write the UNFILTERED list (Aggregated_list/aggregated_withTLD.txt)
-    write_blocklist_file(
-        OUTPUT_FILENAME_UNFILTERED, combined_domains, source_sets, 
-        initial_count, excluded_count, is_filtered=False
-    )
-    
-    # B) Write the FILTERED list (Aggregated_list/aggregated_noTLD.txt)
-    write_blocklist_file(
-        OUTPUT_FILENAME_FILTERED, final_list_set_filtered, source_sets, 
-        initial_count, excluded_count, total_unique_unfiltered_count, change_in_size, is_filtered=True
-    )
-    
-    print(f"\n✅ Successfully created blocklists.")
-    print(f"📊 Central metrics logged to history.csv.")
-    print(f"📄 Detailed report generated: {REPORT_FILENAME}.")
+
+    # history tracking (safe)
+    change = 0
+    header = ['Date', 'Final_Count', 'Change', 'Total_Unfiltered', 'Excluded_Count', 'Unique_Count'] + list(metrics['Source_Counts'].keys())
+    if not args.skip_history:
+        rows = safe_read_history(HISTORY_FILENAME)
+        prev_count = 0
+        if rows and len(rows) > 0:
+            # assume header present; try to read last numeric Final_Count from last row
+            try:
+                prev_count = int(rows[-1][1])
+            except Exception:
+                prev_count = 0
+        change = metrics['Final_Count'] - prev_count
+        new_row = [datetime.now().strftime('%Y-%m-%d'), str(metrics['Final_Count']), str(change), str(metrics['Total_Unfiltered']),
+                   str(metrics['Excluded_Count']), str(metrics['Unique_Count'])]
+        for k in metrics['Source_Counts'].keys():
+            new_row.append(str(metrics['Source_Counts'][k]))
+        # rebuild history rows: keep previous rows that are data (not header)
+        data_rows = [r for r in rows if r and r[0] != header[0]]
+        data_rows.append(new_row)
+        safe_write_history(HISTORY_FILENAME, header, data_rows)
+
+    # prepare report and files
+    top_excluded = excluded_counter.most_common(50)
+    # build unique_by_source for final filtered set
+    unique_by_source = {}
+    for name, s in source_sets.items():
+        unique_by_source[name] = [d for d in s if appearance[d] == 1 and d in final_filtered]
+
+    # write files
+    metrics_header_lines = [
+        f"Final Filtered Count: {metrics['Final_Count']:,}",
+        f"Total Unfiltered Unique: {metrics['Total_Unfiltered']:,}",
+        f"Excluded Count: {metrics['Excluded_Count']:,}",
+        f"Unique to one source (unfiltered): {metrics['Unique_Count']:,}",
+        f"Size change since last run: {change:+}"
+    ]
+    write_blocklist_file(OUTPUT_FILENAME_UNFILTERED, combined, source_sets, metrics_header_lines=None, is_filtered=False)
+    write_blocklist_file(OUTPUT_FILENAME_FILTERED, final_filtered, source_sets, metrics_header_lines=metrics_header_lines, is_filtered=True)
+    generate_markdown_report(REPORT_FILENAME, metrics, top_excluded, unique_by_source, appearance, final_filtered, len(source_sets))
+
+    if args.verbose:
+        print(f"Final filtered: {metrics['Final_Count']:,}  excluded: {metrics['Excluded_Count']:,}  combined: {initial_count:,}")
+        print(f"Report: {REPORT_FILENAME}  Files: {OUTPUT_FILENAME_FILTERED}, {OUTPUT_FILENAME_UNFILTERED}")
+    else:
+        print(f"✅ Done. Final: {metrics['Final_Count']:,}  Excluded: {metrics['Excluded_Count']:,}")
 
 if __name__ == "__main__":
-    generate_blocklist()
+    main()
