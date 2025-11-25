@@ -133,14 +133,34 @@ def fetch_all_sources(sources, session, workers=6, verbose=False):
     return results
 
 def fetch_exclude_tlds(excl_url, session, verbose=False):
+    """
+    Build exclude_tlds only from lines that represent a TLD token.
+    Accept formats like:
+      - "com"
+      - ".com"
+    Reject full domains like "example.com" so we don't accidentally add common TLDs.
+    """
     lines = fetch_text(session, excl_url)
     tlds = set()
     for line in lines:
-        d = parse_domain_from_line(line)
-        if d:
-            t = extract_tld(d)
-            if t:
-                tlds.add(t)
+        raw = line.strip()
+        if not raw or raw.startswith('#') or raw.startswith('!'):
+            continue
+        # strip inline comments
+        if '#' in raw:
+            raw = raw.split('#', 1)[0].strip()
+        # normalize leading dot
+        if raw.startswith('.'):
+            candidate = raw.lstrip('.').lower()
+        else:
+            candidate = raw.lower()
+        # only accept single-label tokens (no dots) and sensible length/chars for a TLD
+        if '.' in candidate:
+            # skip entries that look like full domains
+            continue
+        # basic sanity: allow letters, digits, hyphen; length 2-63
+        if re.fullmatch(r'[a-z0-9\-]{2,63}', candidate):
+            tlds.add(candidate)
     if verbose:
         print(f"Excluded TLDs: {len(tlds)}")
     return tlds
