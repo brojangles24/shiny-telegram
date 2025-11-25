@@ -33,6 +33,7 @@ jobs:
         run: python generate_blocklist.py
       
       - name: Stage All Generated Files
+        # *** THIS IS THE CRUCIAL MISSING STEP ***
         # Manually ensures all files in the Aggregated_list folder are staged
         run: |
           git config --global user.name "GitHub Action Bot"
@@ -44,7 +45,5 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "🤖 Update combined blocklist and metrics report"
-          # This pattern now checks the staged directory
-          file_pattern: Aggregated_list/**/*
+          # We no longer need a complex file_pattern because we staged the whole folder
           skip_dirty_check: false
-          skip_ci: true
