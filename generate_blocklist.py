@@ -17,15 +17,13 @@ BLOCKLIST_SOURCES = {
 EXCLUSION_URL = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/spam-tlds-onlydomains.txt"
 
 OUTPUT_DIR = "Aggregated_list"
-# List 1: The final, filtered list (NO spam TLDs)
 OUTPUT_FILENAME_FILTERED = os.path.join(OUTPUT_DIR, "aggregated_noTLD.txt")
-# List 2: The full, unfiltered combined list (WITH spam TLDs)
 OUTPUT_FILENAME_UNFILTERED = os.path.join(OUTPUT_DIR, "aggregated_withTLD.txt")
 
 HISTORY_FILENAME = os.path.join(OUTPUT_DIR, "history.csv")
 ANALYSIS_FILENAME = os.path.join(OUTPUT_DIR, "overlap_analysis.txt")
 
-# --- Utility Functions ---
+# --- Utility Functions (Omitted for brevity; they remain the same) ---
 
 def fetch_list(url):
     """Fetches content from a URL, returns a list of lines."""
@@ -42,11 +40,9 @@ def process_line(line):
     """Cleans a single line: removes comments, extracts domain from hosts format."""
     line = line.strip().lower()
     
-    # Remove comments (lines starting with # or !) and ignore empty lines
     if not line or line.startswith(('#', '!')):
         return None
         
-    # Handle hosts file format (e.g., '0.0.0.0 example.com')
     parts = line.split()
     if len(parts) > 1 and parts[0] in ('0.0.0.0', '127.0.0.1'):
         domain = parts[1]
@@ -55,7 +51,6 @@ def process_line(line):
     else:
         return None
         
-    # Basic validation/cleanup for common non-domain entries
     if domain in ('localhost', '::1', '255.255.255.255'):
         return None
         
@@ -68,24 +63,37 @@ def extract_tld(domain):
         return None
     return domain.split('.')[-1]
 
-def track_history(final_count):
-    """Reads, updates, and writes the list size history."""
-    header = ['Date', 'Final_Count', 'Change']
+def track_history(final_metrics):
+    """Reads, updates, and writes the list size history, including all counts."""
+    
+    source_names = list(BLOCKLIST_SOURCES.keys())
+    
+    # Define the header including all required metrics
+    header = ['Date', 'Final_Count', 'Change', 'Total_Unfiltered', 'Excluded_Count', 'Unique_Count'] + [f'Source_{name}' for name in source_names]
+    
     history = []
     
     if os.path.exists(HISTORY_FILENAME):
         with open(HISTORY_FILENAME, 'r') as f:
             reader = csv.reader(f)
             history = list(reader)
+            # Check if header exists and skip it if it matches
             if history and history[0] == header:
                 history.pop(0)
 
     current_date = datetime.now().strftime('%Y-%m-%d')
+    current_final_count = final_metrics['Final_Count']
     
+    # Calculate change from last entry (only for the Final_Count)
     last_count = int(history[-1][1]) if history else 0
-    change = final_count - last_count
+    change = current_final_count - last_count
     
-    new_entry = [current_date, str(final_count), str(change)]
+    new_entry = [current_date, str(current_final_count), str(change), str(final_metrics['Total_Unfiltered']), str(final_metrics['Excluded_Count']), str(final_metrics['Unique_Count'])]
+    
+    # Add individual source counts
+    for name in source_names:
+        new_entry.append(str(final_metrics['Source_Counts'][name]))
+    
     history.append(new_entry)
 
     with open(HISTORY_FILENAME, 'w', newline='') as f:
@@ -100,14 +108,12 @@ def perform_overlap_analysis(source_sets, domain_appearance_counter, final_list_
     
     unique_domains_only = {domain for domain, count in domain_appearance_counter.items() if count == 1}
     
-    # Identify top domains by appearance count, but only include those that are NOT filtered out
     top_domains = {}
     
     for i in range(len(source_sets), 1, -1):
         top_domains[f'{i}_lists'] = {domain for domain, count in domain_appearance_counter.items() 
                                      if count == i and domain in final_list_set}
     
-    # Domains unique to one list and made it into the final list
     unique_in_final = {d for d in unique_domains_only if d in final_list_set}
     
     # Write analysis to a new file
@@ -116,7 +122,6 @@ def perform_overlap_analysis(source_sets, domain_appearance_counter, final_list_
         f.write("------------------------------------------------------------------\n")
         f.write(f"Total Unique Domains (All Sources, Before Filter): {total_unique_unfiltered_count:,}\n")
         
-        # Top Domains (Most Common)
         f.write(f"\n## Top Domains (Appearing in Multiple Source Lists)\n")
         f.write(f"NOTE: Only lists domains that made it into the final '{os.path.basename(OUTPUT_FILENAME_FILTERED)}' blocklist.\n\n")
         
@@ -124,7 +129,6 @@ def perform_overlap_analysis(source_sets, domain_appearance_counter, final_list_
             key = f'{count}_lists'
             domain_set = top_domains[key]
             f.write(f"### Domains in ALL {count} Lists ({len(domain_set):,} domains)\n")
-            # Limit the output to the top 50 examples for readability
             for i, domain in enumerate(sorted(list(domain_set))):
                 if i >= 50:
                     f.write(f"... and {len(domain_set) - 50} more.\n")
@@ -132,7 +136,6 @@ def perform_overlap_analysis(source_sets, domain_appearance_counter, final_list_
                 f.write(f"{domain}\n")
             f.write("\n")
             
-        # Unique Domains
         f.write(f"\n## Unique Domains (Appearing in ONLY One Source List)\n")
         f.write(f"Total Unique Domains (in final filtered list): {len(unique_in_final):,}\n")
         
@@ -142,7 +145,6 @@ def perform_overlap_analysis(source_sets, domain_appearance_counter, final_list_
 
         for name, unique_list in unique_by_source.items():
             f.write(f"### Unique to {name} ({len(unique_list):,} domains)\n")
-            # Limit the output to the top 50 examples for readability
             for i, domain in enumerate(sorted(unique_list)):
                 if i >= 50:
                     f.write(f"... and {len(unique_list) - 50} more.\n")
@@ -163,9 +165,9 @@ def write_blocklist_file(filename, list_set, source_sets, initial_count, exclude
         f.write("# ------------------------------------------------------------------\n")
         
         if is_filtered:
-            f.write(f"# TYPE: Filtered List (Spam TLDs REMOVED)\n")
+            f.write(f"# TYPE: Filtered List (Spam TLDs REMOVED) - {os.path.basename(filename)}\n")
         else:
-            f.write(f"# TYPE: Unfiltered List (Contains ALL unique domains)\n")
+            f.write(f"# TYPE: Unfiltered List (Contains ALL unique domains) - {os.path.basename(filename)}\n")
             
         f.write("# ------------------------------------------------------------------\n")
         
@@ -188,6 +190,7 @@ def write_blocklist_file(filename, list_set, source_sets, initial_count, exclude
         for entry in sorted_list:
             f.write(entry + "\n")
 
+
 # --- Main Logic ---
 
 def generate_blocklist():
@@ -195,7 +198,6 @@ def generate_blocklist():
     
     # 1. Fetch and Process Exclusion List
     raw_exclusion_lines = fetch_list(EXCLUSION_URL)
-    
     exclude_tlds = set()
     for line in raw_exclusion_lines:
         domain = process_line(line)
@@ -208,7 +210,7 @@ def generate_blocklist():
 
     # 2. Fetch and Process All Blocklists Separately and Count Overlap
     source_sets = {}
-    combined_domains = set() # This is the full, unfiltered list
+    combined_domains = set()
     domain_appearance_counter = Counter()
 
     for name, url in BLOCKLIST_SOURCES.items():
@@ -246,10 +248,19 @@ def generate_blocklist():
     # 4. Perform Overlap Analysis
     total_unique_count = perform_overlap_analysis(source_sets, domain_appearance_counter, final_list_set_filtered, initial_count)
     
-    # 5. Track History (only tracks the filtered list size)
-    change_in_size = track_history(final_count_filtered)
+    # 5. Prepare Metrics Dictionary for History Tracking
+    metrics = {
+        'Final_Count': final_count_filtered,
+        'Total_Unfiltered': initial_count,
+        'Excluded_Count': excluded_count,
+        'Unique_Count': total_unique_count,
+        'Source_Counts': {name: len(s) for name, s in source_sets.items()}
+    }
     
-    # 6. Write Final Lists
+    # 6. Track History
+    change_in_size = track_history(metrics)
+    
+    # 7. Write Final Lists
     
     # A) Write the UNFILTERED list (Aggregated_list/aggregated_withTLD.txt)
     write_blocklist_file(
@@ -265,7 +276,7 @@ def generate_blocklist():
     
     print(f"\n✅ Successfully created {os.path.basename(OUTPUT_FILENAME_UNFILTERED)} ({initial_count:,} entries).")
     print(f"✅ Successfully created {os.path.basename(OUTPUT_FILENAME_FILTERED)} ({final_count_filtered:,} entries).")
-    print(f"📊 Metrics, history, and detailed overlap analysis saved in {OUTPUT_DIR}/.")
+    print(f"📊 Central metrics logged to history.csv. Detailed analysis in overlap_analysis.txt.")
 
 if __name__ == "__main__":
     generate_blocklist()
