@@ -6,13 +6,13 @@ import matplotlib.pyplot as plt
 
 # --- Config ---
 BLOCKLIST_SOURCES = {
-    "OISD_BIG": "https://raw.githubusercontent.com/oisd/oisd/main/blocks/hosts/oisd_blocklist.txt",
+    "OISD_BIG": "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_big.txt",
     "HAGEZI_ULTIMATE": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/ultimate-onlydomains.txt",
     "1HOSTS_LITE": "https://raw.githubusercontent.com/badmojr/1Hosts/refs/heads/master/Lite/domains.wildcards",
     "STEVENBLACK_HOSTS": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
 }
 
-HAGEZI_ABUSED_TLDS = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/most-abused-tlds.txt"
+HAGEZI_ABUSED_TLDS = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/spam-tlds-onlydomains.txt"
 
 OUTPUT_DIR = "Aggregated_list"
 PRIORITY_FILENAME = os.path.join(OUTPUT_DIR, "priority_300k.txt")
