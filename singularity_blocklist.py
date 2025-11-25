@@ -3,7 +3,7 @@
 🚀 Singularity DNS Blocklist Aggregator (v4.0 - Final Professional Edition)
 
 - ⚡ Implements HTTP Caching (ETag/Last-Modified) for efficient fetching.
-- 🔒 **NEW:** Uses strict Regular Expression for robust domain validation.
+- 🔒 Uses strict Regular Expression for robust domain validation.
 - ⚖️ Uses custom weighted scoring (4, 3, 2, 1) and tracks source overlap.
 - 📈 Generates rich Markdown reports with historical sparklines and detailed source metrics.
 """
@@ -27,7 +27,6 @@ import plotly.io as pio
 
 # Regular expression for robust domain validation. 
 # Ensures valid characters, length (max 253), and structure (requires at least one dot).
-# 
 DOMAIN_REGEX = re.compile(
     r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
 )
@@ -550,7 +549,15 @@ def main():
     # Final check: Inform user about required dependency file (best practice)
     if not Path("requirements.txt").exists():
         logger.info("💡 Recommendation: Create a 'requirements.txt' file for dependency management and stability.")
-        
+    
+    # --- Initialization to prevent NameError in outer scope ---
+    priority_set, abused_tlds, full_filtered = set(), set(), []
+    combined_counter, overlap_counter, domain_sources = Counter(), Counter(), defaultdict(set)
+    all_domains_from_sources = defaultdict(set)
+
+    # Variables only needed for final report/logging
+    total_unfiltered, excluded_count = 0, 0 
+
     try:
         history_path = output_path / HISTORY_FILENAME
         report_path = output_path / REPORT_FILENAME
@@ -573,7 +580,7 @@ def main():
                 logger
             )
 
-        # 4. History Tracking & Metrics
+        # 4. History Tracking & Metrics (Runs outside the session block)
         priority_count = len(priority_set)
         change, history = track_history(priority_count, history_path, logger)
         logger.info(f"📜 History tracked. Priority list change vs. last run: {change:+}")
