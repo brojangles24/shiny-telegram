@@ -31,16 +31,20 @@ jobs:
       - name: Run Blocklist Generation Script
         # Executes your custom Python script (generate_blocklist.py)
         run: python generate_blocklist.py
-        
+      
+      - name: Stage All Generated Files
+        # Manually ensures all files in the Aggregated_list folder are staged
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Aggregated_list
+          
       - name: Commit and Push Changes
-        # Commits all four generated output files if they have changed
+        # Commits the staged files and pushes to the repository
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "🤖 Update combined blocklist and metrics report"
-          # Targets all four output files in the Aggregated_list folder
-          file_pattern: |
-            Aggregated_list/aggregated_noTLD.txt 
-            Aggregated_list/aggregated_withTLD.txt 
-            Aggregated_list/history.csv 
-            Aggregated_list/metrics_report.md 
+          # This pattern now checks the staged directory
+          file_pattern: Aggregated_list/**/*
           skip_dirty_check: false
+          skip_ci: true
