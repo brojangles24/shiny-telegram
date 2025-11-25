@@ -1,0 +1,39 @@
+name: Generate and Update Blocklist
+
+on:
+  # Run daily at 00:00 UTC
+  schedule:
+    - cron: '0 * * * *'
+  # Allow manual trigger via GitHub UI (under the 'Actions' tab)
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        # Downloads your repository code, necessary to run the Python script
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        # Configures Python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Install dependencies
+        # Installs the 'requests' library needed by the Python script
+        run: pip install requests
+        
+      - name: Run Blocklist Generation Script
+        # Executes your custom Python script
+        run: python generate_blocklist.py
+        
+      - name: Commit and Push Changes
+        # Commits the generated files (blocklist and history) if they have changed
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "🤖 Update combined blocklist and history metrics"
+          # Targets both the main blocklist file and the history tracking file
+          file_pattern: Aggregated_list/combined_blocklist.txt Aggregated_list/history.csv
+          skip_dirty_check: false
