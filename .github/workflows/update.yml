@@ -1,7 +1,7 @@
 name: Generate and Update Blocklist
 
 on:
-  # 🎯 FIX: Run daily at 00:00 UTC (midnight)
+  # Run daily at 00:00 UTC (midnight)
   schedule:
     - cron: '0 0 * * *'
   # Allows manual triggering via the GitHub UI
@@ -20,34 +20,28 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Set up Python
-        # Use Python 3.12 for latest features and security
+        # Configures Python 3.12 environment
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           
       - name: Install dependencies (requests, Plotly, Kaleido)
-        # 🎯 FIX: Installs all required libraries including Plotly and Kaleido for image export
+        # Installs all required libraries for fetching, scoring, and visualization
         run: |
           pip install --upgrade pip
           pip install requests plotly kaleido
           
       - name: Run Blocklist Generation Script
-        # Executes your custom Python script (singularity_blocklist.py)
-        # Using the script name provided in the previous step
+        # Executes the enhanced Python script
+        # **NOTE: Ensure your file is actually named 'singularity_aggregator.py'**
         run: python singularity_aggregator.py
         
-      # 🚀 IMPROVEMENT: Use git-auto-commit-action to handle both staging and committing
-      # The previous manual git config/add step is no longer needed.
       - name: Commit and Push Generated Files
-        # This action automatically detects, stages, and commits/pushes files 
-        # created in the Aggregated_list/ directory.
+        # Automatically detects, stages, and commits all files in the output directory
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "🤖 Update combined blocklist and metrics report"
-          # Specify the exact folder to check for changes
+          # Only check the output directory for changes
           file_pattern: Aggregated_list/
-          # Set the bot's name/email explicitly (good practice, though often defaults are fine)
           commit_user_name: "Singularity Bot"
           commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
-          # Use a different branch to commit to, e.g., 'gh-pages' for publishing the HTML dashboard
-          # branch: ${{ github.ref_name }} # Defaults to the current branch (e.g., 'main')
