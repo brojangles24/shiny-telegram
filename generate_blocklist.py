@@ -243,6 +243,14 @@ def generate_blocklist():
                 exclude_tlds.add(tld_segment)
     
     print(f"\nIdentified {len(exclude_tlds)} TLDs for exclusion.")
+    
+    # ------------------- DEBUG LINE -------------------
+    # This will print the first 20 TLDs that the script thinks it should exclude.
+    # We expect to see ['zip', 'mov', 'link', ...]
+    # If you see ['com', 'org', 'net', ...], your EXCLUSION_URL variable is WRONG.
+    print(f"DEBUG: First 20 TLDs to exclude: {sorted(list(exclude_tlds))[:20]}")
+    # ----------------- END DEBUG LINE -----------------
+    
 
     # 2. Fetch and Process All Blocklists Separately and Count Overlap
     source_sets = {}
