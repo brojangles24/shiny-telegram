@@ -550,15 +550,14 @@ def main():
     if not Path("requirements.txt").exists():
         logger.info("💡 Recommendation: Create a 'requirements.txt' file for dependency management and stability.")
     
-    # --- Initialization to prevent NameError in outer scope ---
-    # These variables are required by functions called after the 'with session' block ends
+    # --- CRITICAL FIX: Initialize variables outside the 'with session' block ---
     priority_set, abused_tlds, full_filtered = set(), set(), []
     combined_counter, overlap_counter, domain_sources = Counter(), Counter(), defaultdict(set)
     all_domains_from_sources = defaultdict(set)
 
     # Variables only needed for final report/logging
     total_unfiltered, excluded_count = 0, 0 
-    
+
     try:
         history_path = output_path / HISTORY_FILENAME
         report_path = output_path / REPORT_FILENAME
