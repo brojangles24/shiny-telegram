@@ -48,7 +48,7 @@ TLD_REGEX_TEMPLATE = r"\.{tld}$" # Enhanced regex pattern for TLD filtering
 
 # Scoring and style
 PRIORITY_CAP = 300_000
-SOURCE_WEIGHTS = {"HAGEZI_ULTIMATE": 3, "OISD_BIG": 2, "1HOSTS_LITE": 1, "STEVENBLACK_HOSTS": 1}
+SOURCE_WEIGHTS = {"HAGEZI_ULTIMATE": 4, "1HOSTS_LITE": 3, "OISD_BIG": 2, "STEVENBLACK_HOSTS": 1}
 # Color-coded sources for better reporting/visualization
 SOURCE_COLORS = {
     "HAGEZI_ULTIMATE": "#d62728", # Red
