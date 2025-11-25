@@ -1,6 +1,6 @@
 # 🛡️ Blocklist Aggregation Report
 
-*Generated: 2025-11-25 17:12:44*
+*Generated: 2025-11-25 17:15:54*
 
 
 ---
@@ -10,9 +10,9 @@
 
 | Metric | Count | Change Since Last Run |
 | :--- | :--- | :--- |
-| **Final Filtered Count** | 203,201 | **+60106** |
+| **Final Filtered Count** | 143,095 | **-60106** |
 | Total Unique Domains (Unfiltered) | 451,761 | |
-| Domains Excluded by Spam TLD Filter | 248,560 | |
+| Domains Excluded by Spam TLD Filter | 308,666 | |
 | Domains Unique to ONLY One Source | 315,957 | |
 
 
@@ -28,118 +28,63 @@
 
 ---
 
-## 🌐 Top 50 TLDs in Final Blocklist
+## 🚫 Top 50 Excluded Spam TLDs
 
-This shows the Top 50 Top-Level Domains (TLDs) found in the final filtered `aggregated_noTLD.txt` list.
+*(Based on domains removed from the 'aggregated_noTLD.txt' list)*
 
-```
 
-TLD             | Count     
-
---------------- | ----------
-
-net             | 33,084    
-
-pro             | 11,883    
-
-ru              | 8,524     
-
-fr              | 8,352     
-
-top             | 7,638     
-
-de              | 7,563     
-
-xyz             | 6,407     
-
-info            | 6,393     
-
-shop            | 5,906     
-
-app             | 5,288     
-
-cn              | 4,633     
-
-pl              | 3,983     
-
-online          | 3,878     
-
-click           | 3,672     
-
-icu             | 3,611     
-
-cfd             | 3,526     
-
-dev             | 3,292     
-
-site            | 3,128     
-
-sbs             | 2,470     
-
-digital         | 2,330     
-
-uk              | 2,302     
-
-store           | 2,256     
-
-space           | 2,193     
-
-co              | 2,074     
-
-jp              | 1,947     
-
-cc              | 1,781     
-
-cyou            | 1,521     
-
-website         | 1,504     
-
-link            | 1,470     
-
-biz             | 1,416     
-
-live            | 1,381     
-
-br              | 1,359     
-
-it              | 1,353     
-
-gg              | 1,331     
-
-me              | 1,329     
-
-vn              | 1,223     
-
-nl              | 1,208     
-
-club            | 1,059     
-
-in              | 1,044     
-
-buzz            | 1,015     
-
-rest            | 1,002     
-
-help            | 883       
-
-us              | 851       
-
-lat             | 827       
-
-life            | 823       
-
-au              | 821       
-
-se              | 803       
-
-qpon            | 794       
-
-vip             | 789       
-
-tv              | 781       
-
-```
-
+| Rank | TLD | Exclusion Count |
+| :--- | :--- | :--- |
+| 1 | `.com` | 233,764 |
+| 2 | `.org` | 9,149 |
+| 3 | `.top` | 7,638 |
+| 4 | `.shop` | 5,906 |
+| 5 | `.io` | 4,383 |
+| 6 | `.online` | 3,878 |
+| 7 | `.click` | 3,672 |
+| 8 | `.icu` | 3,611 |
+| 9 | `.cfd` | 3,526 |
+| 10 | `.site` | 3,128 |
+| 11 | `.sbs` | 2,470 |
+| 12 | `.store` | 2,256 |
+| 13 | `.space` | 2,193 |
+| 14 | `.cc` | 1,781 |
+| 15 | `.cyou` | 1,521 |
+| 16 | `.website` | 1,504 |
+| 17 | `.biz` | 1,416 |
+| 18 | `.eu` | 1,250 |
+| 19 | `.club` | 1,059 |
+| 20 | `.buzz` | 1,015 |
+| 21 | `.rest` | 1,002 |
+| 22 | `.help` | 883 |
+| 23 | `.lat` | 827 |
+| 24 | `.life` | 823 |
+| 25 | `.qpon` | 794 |
+| 26 | `.vip` | 789 |
+| 27 | `.world` | 739 |
+| 28 | `.lol` | 449 |
+| 29 | `.today` | 436 |
+| 30 | `.ink` | 423 |
+| 31 | `.work` | 418 |
+| 32 | `.fun` | 399 |
+| 33 | `.wiki` | 357 |
+| 34 | `.fit` | 292 |
+| 35 | `.asia` | 258 |
+| 36 | `.pics` | 221 |
+| 37 | `.su` | 195 |
+| 38 | `.xin` | 190 |
+| 39 | `.name` | 165 |
+| 40 | `.bond` | 156 |
+| 41 | `.pw` | 133 |
+| 42 | `.bid` | 132 |
+| 43 | `.beer` | 126 |
+| 44 | `.love` | 111 |
+| 45 | `.fan` | 102 |
+| 46 | `.ltd` | 97 |
+| 47 | `.blue` | 88 |
+| 48 | `.cm` | 82 |
+| 49 | `.win` | 81 |
+| 50 | `.bet` | 78 |
 
 ---
 
@@ -150,11 +95,9 @@ tv              | 781
 *(Showing up to 50 examples that made it into the final list)*
 
 
-#### Found in ALL 4 Lists (1,194 domains total)
+#### Found in ALL 4 Lists (1,131 domains total)
 
 ```
-
-0n.click
 
 1v0gfa6z0qycr6.dynv6.net
 
@@ -195,8 +138,6 @@ ad-balancer.net
 ad-count.jp
 
 ad-delivery.net
-
-ad-m.asia
 
 ad-move.jp
 
@@ -254,12 +195,16 @@ ad.parom.hu
 
 ad.search.ch
 
-... and 1144 more.
+ad.simgames.net
+
+ad.smaad.jp
+
+... and 1081 more.
 
 ```
 
 
-#### Found in ALL 3 Lists (20,317 domains total)
+#### Found in ALL 3 Lists (8,796 domains total)
 
 ```
 
@@ -283,8 +228,6 @@ ad.search.ch
 
 09qin0pc.xyz
 
-09uu76.top
-
 0fees.net
 
 0n-line.tv
@@ -294,8 +237,6 @@ ad.search.ch
 0vtx1gfc.xyz
 
 0zj2a0bg.xyz
-
-10022020newfolder1002002131-service1002.space
 
 10022020test41-service100201pro2510022020.ru
 
@@ -327,22 +268,6 @@ ad.search.ch
 
 11g1ip22h.de
 
-1234002.shop
-
-1234062.shop
-
-1234074.shop
-
-1234090.shop
-
-1234091.shop
-
-1234099.shop
-
-123sex.biz
-
-12839.click
-
 130gelh8q.de
 
 13554359.xyz
@@ -363,18 +288,36 @@ ad.search.ch
 
 16iis7i2p.de
 
-... and 20267 more.
+16pr72tb5.de
+
+17199874.xyz
+
+17co2k5a.de
+
+17do048qm.de
+
+180hits.de
+
+181m2fscr.de
+
+1827.webhost-02.my-host.network
+
+184c4i95p.de
+
+18tlm4jee.de
+
+19515bia.de
+
+... and 8746 more.
 
 ```
 
 
-#### Found in ALL 2 Lists (42,712 domains total)
+#### Found in ALL 2 Lists (24,543 domains total)
 
 ```
 
 000.gaysexe.free.fr
-
-00002555-coi2.cfd
 
 0001-metrics1-drcn-dt-dbankcloud-cn.geac.dbankedge.cn
 
@@ -398,73 +341,25 @@ ad.search.ch
 
 008.free-counters.co.uk
 
-00ebjdbagyqwt.club
-
-00ky.top
-
 00o.info
 
 00px.net
 
-00wh.top
-
 01-sex-amateur.info
-
-01cg.top
-
-01ky.cc
 
 0234408.cn
 
 0281.jp
 
-029281251-53293828.cfd
-
 02952346.xyz
-
-02fq.top
-
-02gj.top
-
-02hs.top
 
 02ip.ru
 
-03284903.shop
-
-036uuu.top
-
-039571.shop
-
 03e.info
-
-03eg.top
-
-03ez.top
-
-03fw.top
-
-03hq.top
-
-03kq.top
-
-03lm.top
 
 03p.info
 
-04bf112a615942b31.sbs
-
 04xmhp.ru
-
-050f634043855a15c23531bc97c9b3bd.top
-
-052932prywanite-520539-33012192.sbs
-
-052uuu.top
-
-053prywatnieaukcje95121251-250191.sbs
-
-0713.services0701.shop
 
 07443488.xyz
 
@@ -472,17 +367,67 @@ ad.search.ch
 
 08000.info
 
-... and 42662 more.
+09284291.xyz
+
+093093.jp
+
+0a0074066c49886a39b5a3072582f5d6.net
+
+0a0d-d3l1vr.b-cdn.net
+
+0cdn.xyz
+
+0d097ebf.1996e9cb2cc7a61f0bfd0a1e.workers.dev
+
+0d7292.r.axf8.net
+
+0dc5127bd3b3bc23fd0c57e8375f595f.de
+
+0gw7e6s3wrao9y3q.pro
+
+0hc0dika0.pro
+
+0k7wod.cn
+
+0koryu0.easter.ne.jp
+
+0m4.ru
+
+0op8kh.cn
+
+0oqt9i.cn
+
+1.11130.com.cn
+
+1.51sxue.cn
+
+1.66law.cn
+
+1.78500.cn
+
+1.bh5.com.cn
+
+1.feihua.net.cn
+
+1.glook.cn
+
+1.jeasyui.net
+
+1.kuaidiwo.cn
+
+1.off3.ru
+
+... and 24493 more.
 
 ```
 
 
 ### Exclusive Contributions (Domains Unique to ONE List)
 
-Total Unique Domains (in final filtered list): 138,978
+Total Unique Domains (in final filtered list): 108,625
 
 
-#### Unique to OISD WILD (51,541 domains)
+#### Unique to OISD WILD (50,882 domains)
 
 ```
 
@@ -586,12 +531,12 @@ Total Unique Domains (in final filtered list): 138,978
 
 0i4.suncrest0n.ru
 
-... and 51491 more.
+... and 50832 more.
 
 ```
 
 
-#### Unique to HAGEZI ULTIMATE (50,259 domains)
+#### Unique to HAGEZI ULTIMATE (33,735 domains)
 
 ```
 
@@ -601,43 +546,19 @@ Total Unique Domains (in final filtered list): 138,978
 
 0-2.net
 
-0-230-23.rest
-
 0-9.net
 
 0-pal-summit.ru
 
 0-risk.net
 
-0.beer
-
-0.club
-
-0.fashion
-
-0.fit
-
 0.law
 
-0.miami
-
 0.to
-
-0.vip
-
-0.wedding
-
-0.yoga
-
-00.business
 
 00.ca
 
 00.law
-
-00.quest
-
-00.wine
 
 000000000000000.info
 
@@ -671,12 +592,6 @@ Total Unique Domains (in final filtered list): 138,978
 
 000proxy.info
 
-001.name
-
-001.sbs
-
-001.wiki
-
 001041.xyz
 
 001270.xyz
@@ -684,8 +599,6 @@ Total Unique Domains (in final filtered list): 138,978
 0015.info
 
 001660.xyz
-
-0019.biz
 
 001bz.net
 
@@ -695,18 +608,48 @@ Total Unique Domains (in final filtered list): 138,978
 
 001shop.cz
 
-... and 50209 more.
+00224488.xyz
+
+002777.xyz
+
+0033.xyz
+
+00357.info
+
+0049.net
+
+005.us
+
+005.xyz
+
+0069.info
+
+007.ca
+
+0070.net
+
+0076.net
+
+00770055.net
+
+00770066.net
+
+007game.ru
+
+007girls.net
+
+007ts.net
+
+... and 33685 more.
 
 ```
 
 
-#### Unique to 1HOSTS LITE (9,152 domains)
+#### Unique to 1HOSTS LITE (7,277 domains)
 
 ```
 
 012bd3e0-61c6-481e-ad82-933b12c38eee.01.common.usa002.azure-apihub.net
-
-07c225f3.online
 
 0914.global.ssl.fastly.net
 
@@ -716,21 +659,11 @@ Total Unique Domains (in final filtered list): 138,978
 
 0fflce.xyz
 
-0underground.pw
-
 0x5.me
-
-10022020newfolder1002-0144251002202035.site
-
-10022020newfolder33417-01242510022020.space
-
-10022020test136831-service1002012510022020.space
 
 10022020test461-service1002012510022020.host
 
 10022020test51-service1002012510022020.xyz
-
-10022020test61-service1002012510022020.website
 
 127.demdex.net
 
@@ -740,25 +673,15 @@ Total Unique Domains (in final filtered list): 138,978
 
 1axis.sg
 
-1b38tqq7788wfrnti3.cfd
-
 1l-hit.vkplay.ru
 
 1link.mail.ru
-
-1n3.qbyicux2hfx4b9k5.cfd
-
-1nketov.site
-
-1qcvi9fk4otgrleh.cfd
 
 20asb.itocd.net
 
 21slg.xyz
 
 22collector-pxss13u803.perimeterx.net
-
-230320051222585.btl.jbc75.shop
 
 2ad.de
 
@@ -768,23 +691,13 @@ Total Unique Domains (in final filtered list): 138,978
 
 2ip.me
 
-2mpekrveulopj9y.rest
-
 300gsyn.it
 
 31337.hk
 
-3f7gjgpy44xzxli.cfd
-
-3pjnzx6ym3vn2hftzi.cfd
-
-3qnb4ngoicq8mo53w6n5.rest
-
 402.100autolive.nl
 
 41ku.cn
-
-4kpuqcwu4tyqguktzkut.cfd
 
 50bil.xyz
 
@@ -792,44 +705,68 @@ Total Unique Domains (in final filtered list): 138,978
 
 58add99b.webengage.co
 
-594ch3fbkgl4qhq7nfrw4xpme9xt.cfd
-
 62c0207d-ffb0-444b-ad18-e995ca02d994.webhook.uks.azure-automation.net
-
-6ms.biz
-
-74f26d34ffff049368a6cff8812f86ee.ml
 
 772bd5d2fe04.xyz
 
 7a891557-ad63-4e02-9c57-292413513b77.okkoinfo.ru
 
-... and 9102 more.
+7eer.net
+
+88fe13af-3459-4f0f-ad07-2e4c956289ce.dns-clientinfo.vtg.paramount.tech
+
+95ba8317-4854-ea5d-ad00-7cf9363d1da7.07.common.uk.azure-apihub.net
+
+970-cs-c31edf62-97c9-402a-ad41-22681ffa2668.cs-asia-southeast1-seal.cloudshell.dev
+
+9c6e68eb-06c3-4d70-ad51-6e40ae2a07f2.agentsvc.azure-automation.net
+
+9jdq2a.poco.de
+
+a.cdngeek.net
+
+a.closerpets.co.uk
+
+a.iad.lpsnmedia.net
+
+a.interactivead.network
+
+a.kajabimail.net
+
+a.kidoz.net
+
+a.kik.bg
+
+a.lon.lpsnmedia.net
+
+a.lvt.ru
+
+a.moitepari.bg
+
+a.ns.inbox.lv
+
+a.partner-versicherung.de
+
+a.photowonder.net
+
+... and 7227 more.
 
 ```
 
 
-#### Unique to STEVENBLACK HOSTS (28,026 domains)
+#### Unique to STEVENBLACK HOSTS (16,731 domains)
 
 ```
 
 0.0.0.0
 
-00001.cfd
-
-0039keh.icu
-
 011707160008.c.mystat-in.net
-
-015298978-xzczx.sbs
 
 0202.com.tw
 
 0427d7.se
 
 0532a9.r.axf8.net
-
-05931828201029712.sbs
 
 061606084448.c.mystat-in.net
 
@@ -845,15 +782,9 @@ Total Unique Domains (in final filtered list): 138,978
 
 0927378.xyz
 
-0aksj7s.icu
-
 0d79ed.r.axf8.net
 
 0f36f3.r.axf8.net
-
-0lx.zam0wlenle73737.top
-
-0lx.zam0wlenlef8445.top
 
 0pn.ru
 
@@ -861,19 +792,11 @@ Total Unique Domains (in final filtered list): 138,978
 
 0qizz.super-promo.hoxo.info
 
-0snw78.lat
-
-0wnvd5.icu
-
 1-2fly-befragung.de
-
-1-directshipmtdhlsexpress-order.help
 
 1.allyes.com.cn
 
 10.im.cz
-
-1000fapvids.online
 
 1000ps.oewabox.at
 
@@ -907,12 +830,34 @@ Total Unique Domains (in final filtered list): 138,978
 
 112006133326.c.mystat-in.net
 
-1137uu.top
-
 121807150325.c.mystat-in.net
 
 122.2o7.net
 
-... and 27976 more.
+122907224924.c.mystat-in.net
+
+123moviesfox.co
+
+12724.xyz
+
+1435575.fls.doubleclick.net
+
+14713804a.l2m.net
+
+14b.info
+
+15432452.xyz
+
+15b37.skroc.pl
+
+15x.info
+
+16245126.xyz
+
+16aq.cn
+
+1726363.xyz
+
+... and 16681 more.
 
 ```
