@@ -32,7 +32,7 @@ jobs:
         
       - name: Run Blocklist Generation Script
         # Executes your custom Python script (generate_blocklist.py)
-        run: python generate_blocklist.py
+        run: python singularity_blocklist.py
       
       - name: Stage All Generated Files
         # *** THIS IS THE CRUCIAL MISSING STEP ***
