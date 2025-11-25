@@ -23,7 +23,7 @@ OUTPUT_FILENAME_UNFILTERED = os.path.join(OUTPUT_DIR, "aggregated_withTLD.txt")
 HISTORY_FILENAME = os.path.join(OUTPUT_DIR, "history.csv")
 REPORT_FILENAME = os.path.join(OUTPUT_DIR, "metrics_report.md") 
 
-# --- Utility Functions (Only the critical file writing functions are shown) ---
+# --- Utility Functions ---
 
 def fetch_list(url):
     """Fetches content from a URL, returns a list of lines."""
@@ -61,7 +61,11 @@ def extract_tld(domain):
     domain = domain.lstrip('*').lstrip('.').strip()
     if not domain:
         return None
-    return domain.split('.')[-1]
+    # Use split to get the last component, which is treated as the TLD
+    parts = domain.split('.')
+    if len(parts) > 1:
+        return parts[-1]
+    return None # Not a valid TLD if it's just 'localhost' or similar
 
 def track_history(final_metrics):
     """Reads, updates, and writes the list size history, including all counts."""
@@ -124,7 +128,25 @@ def generate_markdown_report(metrics, domain_appearance_counter, final_list_set,
         report_content.append(f"| {name.replace('_', ' ')} | {count:,} |")
     report_content.append(f"\n---\n")
 
-    # --- Section 3: Overlap and Analysis ---
+    # --- NEW SECTION: Top 50 TLDs ---
+    report_content.append(f"## 🌐 Top 50 TLDs in Final Blocklist\n")
+    report_content.append(f"This shows the Top 50 Top-Level Domains (TLDs) found in the final filtered `aggregated_noTLD.txt` list.\n")
+    
+    tld_counter = Counter()
+    for domain in final_list_set: # final_list_set is the filtered set
+        tld = extract_tld(domain)
+        if tld:
+            tld_counter[tld] += 1
+    
+    report_content.append("```\n")
+    report_content.append(f"{'TLD':<15} | {'Count':<10}\n")
+    report_content.append(f"{'-'*15} | {'-'*10}\n")
+    for tld, count in tld_counter.most_common(50):
+        report_content.append(f"{tld:<15} | {count:<10,}\n")
+    report_content.append("```\n")
+    report_content.append(f"\n---\n")
+
+    # --- Section 4: Overlap and Analysis ---
     
     # Identify unique and top domains
     unique_domains_only = {domain for domain, count in domain_appearance_counter.items() if count == 1}
@@ -161,16 +183,15 @@ def generate_markdown_report(metrics, domain_appearance_counter, final_list_set,
             if i >= 50:
                 report_content.append(f"... and {len(unique_list) - 50} more.\n")
                 break
-            f'{domain}\n'
+            report_content.append(f"{domain}\n")
         report_content.append("```\n")
 
-    # *** FIX: Using explicit UTF-8 encoding for reliable writing ***
+    # *** Use explicit UTF-8 encoding for reliable writing ***
     try:
         with open(REPORT_FILENAME, "w", encoding='utf-8') as f:
             f.write("\n".join(report_content))
     except Exception as e:
         print(f"FATAL ERROR writing Markdown report: {e}", file=sys.stderr)
-        # We allow the script to continue to write the other critical files
 
     return len(unique_domains_only)
 
@@ -180,7 +201,7 @@ def write_blocklist_file(filename, list_set, source_sets, initial_count, exclude
     sorted_list = sorted(list(list_set))
     final_count = len(sorted_list)
     
-    # Use explicit UTF-8 encoding for blocklists as well
+    # Use explicit UTF-8 encoding for blocklists
     with open(filename, "w", encoding='utf-8') as f:
         f.write("# Blocklist Aggregation Report\n")
         f.write(f"# Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
