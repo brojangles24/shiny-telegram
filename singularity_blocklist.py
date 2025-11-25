@@ -90,10 +90,18 @@ def fetch_and_process_sources(session:requests.Session)->Dict[str,Set[str]]:
             logging.info(f"Fetched {len(domains):,} domains from {name}")
     return source_sets
 
-def aggregate_and_score_domains(source_sets:Dict[str,Set[str]]):
-    combined_counter=Counter(); overlap_counter=Counter(); domain_sources=defaultdict(set)
-    for name,domains in source_sets.items(): w=SOURCE_WEIGHTS.get(name,1); 
-        for d in domains: combined_counter[d]+=w; overlap_counter[d]+=1; domain_sources[d].add(name)
+def aggregate_and_score_domains(source_sets: Dict[str, Set[str]]):
+    combined_counter = Counter()
+    overlap_counter = Counter()
+    domain_sources = defaultdict(set)
+
+    for name, domains in source_sets.items():
+        w = SOURCE_WEIGHTS.get(name, 1)
+        for d in domains:
+            combined_counter[d] += w
+            overlap_counter[d] += 1
+            domain_sources[d].add(name)
+
     return combined_counter, overlap_counter, domain_sources
 
 def filter_and_prioritize(combined_counter:Counter, session:requests.Session):
