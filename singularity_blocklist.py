@@ -41,6 +41,7 @@ BLOCKLIST_SOURCES: Dict[str, str] = {
     "STEVENBLACK_HOSTS": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
     "ANUDEEP_ADSERVERS": "https://raw.githubusercontent.com/anudeepND/blacklist/master/adservers.txt",
     "ADAWAY_HOSTS": "https://adaway.org/hosts.txt",
+    # ADGUARD_DNS removed for stability
 }
 HAGEZI_ABUSED_TLDS: str = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/spam-tlds-onlydomains.txt"
 
@@ -559,12 +560,20 @@ def write_output_files(
 
 # --- Main Execution ---
 
-# In singularity_blocklist.py
-
 def main():
     """Main function to run the aggregation process."""
     parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v4.6)")
-    # ... (parser arguments remain the same) ...
+    parser.add_argument(
+        "-o", "--output", 
+        type=Path, 
+        default=OUTPUT_DIR, 
+        help=f"Output directory (default: {OUTPUT_DIR})"
+    )
+    parser.add_argument(
+        "-d", "--debug", 
+        action="store_true", 
+        help="Enable DEBUG logging"
+    )
     args = parser.parse_args()
     
     logger = ConsoleLogger(args.debug)
@@ -621,10 +630,44 @@ def main():
         
         source_metrics = calculate_source_metrics(priority_set, full_filtered, overlap_counter, domain_sources, all_domains_from_sources)
 
-        # ... (rest of the functions are called) ...
+        # 5. Reporting & Visualization
+        generate_interactive_dashboard(
+            full_filtered, 
+            overlap_counter, 
+            domain_sources,
+            dashboard_html_path,
+            heatmap_image_path,
+            logger
+        )
+        
+        generate_markdown_report(
+            priority_count, 
+            change, 
+            total_unfiltered, 
+            excluded_count, 
+            full_filtered, 
+            overlap_counter, 
+            report_path,
+            dashboard_html_path,
+            source_metrics,
+            history,
+            logger
+        )
+        
+        # 6. File Writing
+        write_output_files(
+            priority_set, 
+            abused_tlds, 
+            full_filtered, 
+            output_path, 
+            logger
+        )
         
     except Exception as e:
-        # ... (error handling remains the same) ...
+        logger.error(f"FATAL ERROR during execution: {e.__class__.__name__}: {e}")
+        if args.debug:
+            import traceback
+            traceback.print_exc()
         sys.exit(1)
         
     logger.info(f"--- ✅ Aggregation Complete in {(datetime.now() - start).total_seconds():.2f}s ---")
