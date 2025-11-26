@@ -1,17 +1,17 @@
 # 🛡️ Singularity DNS Blocklist Dashboard
-*Generated: 2025-11-26 00:46:06*
+*Generated: 2025-11-26 01:21:37*
 
 ## 📜 Historical Trends
 | Metric | Count | 7-Day Trend |
 | :--- | :--- | :--- |
-| **Total Unique Domains** | **487,307** | <span style='color:gray;'>`+0` ➡️</span> &nbsp; **█** |
+| **Total Unique Domains** | **534,596** | <span style='color:green;'>`+47273` ⬆️</span> &nbsp; **█** |
 | **Trend Window** | 2025-11-26 to 2025-11-26 | |
 
 ## 🔑 Summary Metrics
 | Metric | Count | Details |
 | :--- | :--- | :--- |
-| Domains with **High Consensus (Score 6+)** | 85,855 | Highest consensus domains. |
-| Domains Excluded by TLD Filter| 60,449 | TLD filter efficacy metric. |
+| Domains with **High Consensus (Score 6+)** | 99,377 | Highest consensus domains. |
+| Domains Excluded by TLD Filter| 66,245 | TLD filter efficacy metric. |
 | Priority List Size | 300,000 | Capped domains selected from full list. |
 
 ---
@@ -19,12 +19,13 @@
 ## 🌐 Source Performance & Contribution
 | Source | Weight | Total Fetched | In Priority List | % Contributed | Unique to Source | Color |
 | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **HAGEZI_ULTIMATE** | 4 | 232,365 | 186,087 | 100.0% | 100,509 | <span style='color:#d62728;'>███</span> |
-| **1HOSTS_LITE** | 3 | 92,483 | 79,145 | 100.0% | 20,522 | <span style='color:#2ca02c;'>███</span> |
-| **OISD_BIG** | 2 | 215,545 | 141,245 | 75.2% | 111,984 | <span style='color:#1f77b4;'>███</span> |
-| **ANUDEEP_ADSERVERS** | 2 | 42,348 | 7,003 | 16.7% | 34,971 | <span style='color:#9467bd;'>███</span> |
+| **HAGEZI_ULTIMATE** | 4 | 232,040 | 185,799 | 100.0% | 88,842 | <span style='color:#d62728;'>███</span> |
+| **1HOSTS_LITE** | 3 | 92,483 | 79,145 | 100.0% | 19,102 | <span style='color:#2ca02c;'>███</span> |
+| **ADGUARD_BASE** | 3 | 119,093 | 98,611 | 100.0% | 41,710 | <span style='color:#17becf;'>███</span> |
+| **OISD_BIG** | 2 | 215,545 | 99,452 | 52.9% | 109,664 | <span style='color:#1f77b4;'>███</span> |
+| **ANUDEEP_ADSERVERS** | 2 | 42,348 | 7,045 | 16.8% | 34,929 | <span style='color:#9467bd;'>███</span> |
 | **ADAWAY_HOSTS** | 2 | 6,540 | 6,488 | 99.8% | 10 | <span style='color:#8c564b;'>███</span> |
-| **STEVENBLACK_HOSTS** | 1 | 97,120 | 37,505 | 45.3% | 45,204 | <span style='color:#ff7f0e;'>███</span> |
+| **STEVENBLACK_HOSTS** | 1 | 97,120 | 37,763 | 45.7% | 44,946 | <span style='color:#ff7f0e;'>███</span> |
 
 ---
 
@@ -32,12 +33,13 @@
 Detailed count of how many domains in the filtered list appeared in multiple sources.
 | Overlap Level (Sources) | Domains (Count) | % of Filtered List |
 | :---: | :---: | :---: |
-| **6** | 158 | 0.0% |
-| **5** | 912 | 0.2% |
-| **4** | 3,769 | 0.9% |
-| **3** | 32,909 | 7.7% |
-| **2** | 75,910 | 17.8% |
-| **1** | 313,200 | 73.4% |
+| **7** | 110 | 0.0% |
+| **6** | 686 | 0.1% |
+| **5** | 2,494 | 0.5% |
+| **4** | 21,530 | 4.6% |
+| **3** | 31,319 | 6.7% |
+| **2** | 73,009 | 15.6% |
+| **1** | 339,203 | 72.4% |
 
 ---
 
