@@ -1,22 +1,18 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v3.0 - Professional Edition)
+🚀 Singularity DNS Blocklist Aggregator (v4.0 - Final Professional Edition)
 
-- ⚡ Implements HTTP Caching (ETag/Last-Modified) for fast, bandwidth-efficient fetching.
+- ⚡ Implements HTTP Caching (ETag/Last-Modified) for efficient fetching.
+- 🔒 Uses strict Regular Expression for robust domain validation.
 - ⚖️ Uses custom weighted scoring (4, 3, 2, 1) and tracks source overlap.
-- 🚫 Filters out domains based on a separate, frequently abused TLD list.
-- 💾 Generates prioritized, full, and regex-TLD lists.
-- 📈 Creates an interactive Plotly dashboard (heatmap & source distribution).
-- 📝 Generates a detailed, color-coded Markdown report with:
-    - Historical sparkline trend graph.
-    - Full source-by-source contribution metrics.
-    - Exact domain overlap counts.
+- 📈 Generates rich Markdown reports with historical sparklines and detailed source metrics.
 """
 import sys
 import csv
 import logging
 import argparse
 import json
+import re
 from datetime import datetime
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -28,6 +24,12 @@ import plotly.graph_objects as go
 import plotly.io as pio
 
 # --- Configuration & Constants ---
+
+# Regular expression for robust domain validation. 
+# Ensures valid characters, length (max 253), and structure (requires at least one dot).
+DOMAIN_REGEX = re.compile(
+    r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
+)
 
 # Define the sources for blocklists
 BLOCKLIST_SOURCES: Dict[str, str] = {
@@ -106,6 +108,8 @@ def load_cache() -> Dict[str, Any]:
 def save_cache(cache_data: Dict[str, Any]):
     """Saves cache headers and file content to disk."""
     try:
+        # Create directory if it doesn't exist
+        CACHE_FILE.parent.mkdir(exist_ok=True)
         with open(CACHE_FILE, 'w', encoding='utf-8') as f:
             json.dump(cache_data, f, indent=2)
     except Exception as e:
@@ -113,9 +117,8 @@ def save_cache(cache_data: Dict[str, Any]):
 
 def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, Any], logger: ConsoleLogger) -> List[str]:
     """Fetches list with ETag/Last-Modified caching."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/3.0'}
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/4.0'}
     
-    # 1. Prepare conditional headers
     cached_headers = cache.get("headers", {}).get(name, {})
     if 'ETag' in cached_headers:
         headers['If-None-Match'] = cached_headers['ETag']
@@ -130,7 +133,7 @@ def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, 
             logger.info(f"⚡ Fetched {len(cache['content'].get(name, [])):,} domains from **{name}** (Cache: 304 Not Modified)")
             return cache['content'].get(name, [])
 
-        # 2. Update cache if modified (status code 200)
+        # Update cache if modified (status code 200)
         content_lines = [l.strip().lower() for l in resp.text.splitlines() if l.strip()]
         
         cache['headers'][name] = {}
@@ -148,20 +151,23 @@ def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, 
 
 
 def process_domain(line: str) -> Optional[str]:
-    """Cleans a line from a blocklist file to extract a canonical domain."""
+    """Cleans a line from a blocklist file and applies strict validation."""
     if not line or line.startswith(("#", "!", "|")):
         return None
     
     parts = line.split()
-    # Simple logic for hosts file or simple domain list
     domain = parts[1] if len(parts) > 1 and parts[0] in ("0.0.0.0", "127.0.0.1") else parts[0] if len(parts) == 1 else None
     
     if not domain: return None
     
     domain = domain.strip().lower().lstrip("*").lstrip(".")
     
-    # Simple validation and exclusion
-    if domain in ("localhost", "localhost.localdomain", "::1", "255.255.255.255", "wpad") or "." not in domain:
+    # 1. Exclusion of reserved names
+    if domain in ("localhost", "localhost.localdomain", "::1", "255.255.255.255", "wpad"):
+        return None
+    
+    # 2. **STRICT REGEX VALIDATION**
+    if not DOMAIN_REGEX.match(domain):
         return None
     
     return domain
@@ -219,12 +225,11 @@ def generate_sparkline(values: List[int], logger: ConsoleLogger) -> str:
     num_chars = len(ASCII_SPARKLINE_CHARS) - 1
     
     if range_val == 0:
-        return ASCII_SPARKLINE_CHARS[-1] * len(values) # Full bar if no change
+        return ASCII_SPARKLINE_CHARS[-1] * len(values)
 
     try:
         sparkline = ""
         for val in values:
-            # Map the value to one of the 8 characters
             index = int((val - min_val) / range_val * num_chars)
             sparkline += ASCII_SPARKLINE_CHARS[index]
         return sparkline
@@ -241,7 +246,6 @@ def fetch_and_process_sources(session: requests.Session, logger: ConsoleLogger) 
     
     all_domains_from_sources: Dict[str, Set[str]] = defaultdict(set)
     
-    # Use 4 workers max 
     max_workers = min(4, len(BLOCKLIST_SOURCES)) 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_name = {
@@ -262,7 +266,6 @@ def fetch_and_process_sources(session: requests.Session, logger: ConsoleLogger) 
                 logger.error(f"Source {name} generated an exception: {exc}")
                 source_sets[name] = set()
     
-    # Save cache after all fetches are complete
     save_cache(cache)
     
     return source_sets, all_domains_from_sources
@@ -282,7 +285,37 @@ def aggregate_and_score_domains(source_sets: Dict[str, Set[str]]) -> Tuple[Count
 
     return combined_counter, overlap_counter, domain_sources
 
-# ... (filter_and_prioritize remains the same)
+def filter_and_prioritize(
+    combined_counter: Counter, 
+    session: requests.Session, 
+    logger: ConsoleLogger
+) -> Tuple[Set[str], Set[str], int, List[str]]:
+    """Filters domains by abused TLDs and selects the top-scoring domains."""
+    
+    tld_lines = fetch_list(HAGEZI_ABUSED_TLDS, "HAGEZI_TLDS", session, load_cache(), logger)
+    # Ensure TLDs are clean and lowercase
+    abused_tlds = {l.strip().lower() for l in tld_lines if l and not l.startswith("#")}
+    logger.info(f"🚫 Excluding domains with {len(abused_tlds)} known abusive TLDs.")
+    
+    filtered_weighted: List[Tuple[str, int]] = []
+    excluded_count = 0
+    
+    for domain, weight in combined_counter.items():
+        tld = extract_tld(domain)
+        if tld in abused_tlds:
+            excluded_count += 1
+        else:
+            filtered_weighted.append((domain, weight))
+            
+    filtered_weighted.sort(key=lambda x: x[1], reverse=True)
+    
+    final_priority = {d for d, _ in filtered_weighted[:PRIORITY_CAP]}
+    full_filtered = [d for d, _ in filtered_weighted] 
+    
+    logger.info(f"🔥 Excluded {excluded_count:,} domains by TLD filter.")
+    logger.info(f"💾 Priority list capped at {len(final_priority):,} domains.")
+    
+    return final_priority, abused_tlds, excluded_count, full_filtered
 
 def calculate_source_metrics(
     priority_set: Set[str], 
@@ -294,27 +327,71 @@ def calculate_source_metrics(
     """Calculates contribution and uniqueness metrics per source."""
     metrics = defaultdict(lambda: defaultdict(int))
     
-    # Calculate In_Priority_List and Unique_to_Source using the filtered list
     for domain in full_filtered:
         sources = domain_sources[domain]
         
-        # 1. Track contribution to the final Priority List
         if domain in priority_set:
             for source in sources:
                 metrics[source]["In_Priority_List"] += 1
                 
-        # 2. Track uniqueness 
         if overlap_counter[domain] == 1:
             unique_source = list(sources)[0]
             metrics[unique_source]["Unique_to_Source"] += 1
 
-    # Add the Total Fetched count (before processing) for the report
     for name, domains in all_domains_from_sources.items():
          metrics[name]["Total_Fetched"] = len(domains)
             
     return dict(metrics)
 
 # --- Reporting and Visualization ---
+
+def generate_interactive_dashboard(
+    full_filtered: List[str], 
+    overlap_counter: Counter, 
+    domain_sources: Dict[str, Set[str]],
+    html_path: Path,
+    image_path: Path,
+    logger: ConsoleLogger
+):
+    """Generates a Plotly stacked bar chart showing source overlap."""
+    logger.info(f"📈 Generating interactive dashboard at {html_path.name}")
+    
+    sources = list(BLOCKLIST_SOURCES.keys())
+    overlap_levels = sorted(
+        {overlap_counter[d] for d in full_filtered}, 
+        reverse=True
+    )
+    heatmap_data: Dict[str, List[int]] = {src: [] for src in sources}
+    
+    for level in overlap_levels:
+        domains_at_level = [d for d in full_filtered if overlap_counter[d] == level]
+        for src in sources:
+            count = sum(1 for d in domains_at_level if src in domain_sources[d])
+            heatmap_data[src].append(count)
+            
+    fig = go.Figure()
+    for src in sources:
+        fig.add_trace(go.Bar(
+            x=[str(l) for l in overlap_levels],
+            y=heatmap_data[src],
+            name=src,
+            marker_color=SOURCE_COLORS[src],
+            hovertemplate="<b>Source:</b> %{name}<br><b>Overlap Level:</b> %{x}<br><b>Domains:</b> %{y:}<extra></extra>"
+        ))
+        
+    fig.update_layout(
+        barmode='stack',
+        title="Singularity DNS Domain Overlap Heatmap (Filtered List)",
+        xaxis_title="Number of Sources Domain Appears In",
+        yaxis_title="Domain Count (Filtered List)",
+        template="plotly_dark",
+        legend_title_text="Blocklist Source",
+        hovermode="x unified"
+    )
+    
+    pio.write_html(fig, str(html_path), auto_open=False, full_html=True, include_plotlyjs='cdn')
+    fig.write_image(str(image_path), scale=1) 
+
 
 def generate_markdown_report(
     priority_count: int, 
@@ -336,7 +413,6 @@ def generate_markdown_report(
     report.append(f"# 🛡️ Singularity DNS Blocklist Dashboard")
     report.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
     
-    # Calculate derived metrics
     trend_icon = "⬆️" if change > 0 else "⬇️" if change < 0 else "➡️"
     trend_color = "green" if change > 0 else "red" if change < 0 else "gray"
     max_score_count = sum(1 for d in full_filtered_list if overlap_counter.get(d) == MAX_SCORE)
@@ -344,7 +420,6 @@ def generate_markdown_report(
     # --- Historical Data ---
     report.append(f"\n## 📜 Historical Trends")
     
-    # Prepare sparkline data (last 7 days of counts)
     history_counts = [int(h['Priority_Count']) for h in history][-7:]
     sparkline_str = generate_sparkline(history_counts, logger)
     history_dates = [h['Date'] for h in history][-7:]
@@ -357,7 +432,7 @@ def generate_markdown_report(
     report.append("\n## 🔑 Summary Metrics")
     report.append("| Metric | Count | Details |")
     report.append("| :--- | :--- | :--- |")
-    report.append(f"| Domains with Max Score ({MAX_SCORE}) | {max_score_count:,} | Highest consensus domains. |")
+    report.append(f"| Domains with Max Score ({MAX_SCORE}) | {max_score_count:,} | Highest consensus domains (Score {MAX_SCORE}). |")
     report.append(f"| Domains Excluded by TLD Filter| {excluded_count:,} | TLD filter efficacy metric. |")
     report.append(f"| Total Unique Domains (Pre-Filter) | {total_unfiltered:,} | Total candidates before TLD cleanup. |")
 
@@ -376,8 +451,7 @@ def generate_markdown_report(
         in_priority = source_metrics.get(name, {}).get("In_Priority_List", 0)
         unique_count = source_metrics.get(name, {}).get("Unique_to_Source", 0)
         
-        # Calculate percentage contribution: needs the total number of domains in the FILTERED list that came from this source.
-        total_in_filtered_from_source = sum(1 for d in full_filtered_list if d in overlap_counter and name in domain_sources.get(d, set()))
+        total_in_filtered_from_source = sum(1 for d in full_filtered_list if name in domain_sources.get(d, set()))
         percent_contributed = f"{(in_priority / total_in_filtered_from_source * 100):.1f}%" if total_in_filtered_from_source > 0 else "0.0%"
         color = SOURCE_COLORS.get(name, "black")
         
@@ -413,11 +487,45 @@ def generate_markdown_report(
         f.write("\n".join(report))
 
 
+# --- File Writing ---
+
+def write_output_files(
+    priority_set: Set[str], 
+    abused_tlds: Set[str], 
+    full_list: List[str], 
+    output_path: Path, 
+    logger: ConsoleLogger
+):
+    """Writes the final blocklist, TLD regex, and full aggregated files."""
+    logger.info("💾 Writing final output files...")
+    output_path.mkdir(exist_ok=True, parents=True)
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # 1. Priority List
+    priority_file = output_path / PRIORITY_FILENAME
+    with open(priority_file, "w", encoding="utf-8") as f:
+        f.write(f"# Priority {PRIORITY_CAP} Blocklist\n# Generated: {now_str}\n# Total: {len(priority_set):,}\n")
+        f.writelines(d + "\n" for d in sorted(priority_set))
+    
+    # 2. Abused TLD Regex List
+    regex_file = output_path / REGEX_TLD_FILENAME
+    with open(regex_file, "w", encoding="utf-8") as f:
+        f.write(f"# Hagezi Abused TLDs Regex List\n# Generated: {now_str}\n# Total: {len(abused_tlds):,}\n")
+        f.writelines(f"\\.{t}$\n" for t in sorted(abused_tlds))
+        
+    # 3. Full Aggregated List
+    unfiltered_file = output_path / UNFILTERED_FILENAME
+    with open(unfiltered_file, "w", encoding="utf-8") as f:
+        f.write(f"# Full Aggregated List (Filtered by TLDs, Sorted by Score)\n# Generated: {now_str}\n# Total: {len(full_list):,}\n")
+        f.writelines(d + "\n" for d in full_list)
+        
+    logger.info(f"✅ Outputs written to: {output_path.resolve()}")
+
 # --- Main Execution ---
 
 def main():
     """Main function to run the aggregation process."""
-    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v3.0)")
+    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v4.0)")
     parser.add_argument(
         "-o", "--output", 
         type=Path, 
@@ -436,8 +544,21 @@ def main():
     output_path.mkdir(exist_ok=True)
     
     start = datetime.now()
-    logger.info("--- 🚀 Starting Singularity DNS Aggregation (Enhanced Metrics Edition) ---")
+    logger.info("--- 🚀 Starting Singularity DNS Aggregation (Final Professional Edition) ---")
     
+    # Final check: Inform user about required dependency file (best practice)
+    if not Path("requirements.txt").exists():
+        logger.info("💡 Recommendation: Create a 'requirements.txt' file for dependency management and stability.")
+    
+    # --- Initialization to prevent NameError in outer scope ---
+    # These variables are required by functions called after the 'with session' block ends
+    priority_set, abused_tlds, full_filtered = set(), set(), []
+    combined_counter, overlap_counter, domain_sources = Counter(), Counter(), defaultdict(set)
+    all_domains_from_sources = defaultdict(set)
+
+    # Variables only needed for final report/logging
+    total_unfiltered, excluded_count = 0, 0
+
     try:
         history_path = output_path / HISTORY_FILENAME
         report_path = output_path / REPORT_FILENAME
@@ -460,7 +581,7 @@ def main():
                 logger
             )
 
-        # 4. History Tracking & Metrics
+        # 4. History Tracking & Metrics (Runs outside the session block)
         priority_count = len(priority_set)
         change, history = track_history(priority_count, history_path, logger)
         logger.info(f"📜 History tracked. Priority list change vs. last run: {change:+}")
@@ -502,7 +623,6 @@ def main():
         
     except Exception as e:
         logger.error(f"FATAL ERROR during execution: {e.__class__.__name__}: {e}")
-        # Print full traceback in debug mode
         if args.debug:
             import traceback
             traceback.print_exc()
