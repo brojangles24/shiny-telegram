@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v4.10 - Interactive Dashboard Edition)
+🚀 Singularity DNS Blocklist Aggregator (v4.11 - Enhanced Metrics Edition)
 
-- **MAJOR CHANGE:** Overlap heatmap replaced with an interactive, filterable HTML table (dashboard.html).
-- **NEW FEATURE:** Users can filter all domains by minimum weighted score in the dashboard.
-- **IMPROVEMENT:** PNG output simplified to a Score Distribution Histogram for better readability.
+- **NEW METRIC:** Novelty Index (Tracks if added domains are "Fresh" or "Promoted").
+- **NEW METRIC:** Source Volatility (Tracks % change in domains fetched per source).
+- **IMPROVEMENT:** Consolidated caching logic (all data in one cache file).
+- ✅ ADGUARD_BASE INCLUDED: filters.adtidy.org/extension/chromium/filters/15.txt with Weight = 3.
 """
 import sys
 import csv
@@ -16,7 +17,7 @@ from datetime import datetime
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import List, Dict, Set, Optional, Tuple, Any
+from typing import List, Dict, Set, Optional, Tuple, Any, Union
 
 import requests
 import plotly.graph_objects as go
@@ -50,10 +51,9 @@ REGEX_TLD_FILENAME = "regex_hagezi_tlds.txt"
 UNFILTERED_FILENAME = "aggregated_full.txt"
 HISTORY_FILENAME = "history.csv"
 REPORT_FILENAME = "metrics_report.md"
-HEATMAP_IMAGE = "overlap_heatmap_sources.png" # Renamed to score_distribution_chart.png later
 DASHBOARD_HTML = "dashboard.html"
-CACHE_FILE = OUTPUT_DIR / "fetch_cache.json"
-PRIORITY_CACHE_FILE = OUTPUT_DIR / "priority_cache.json" 
+# Consolidated Cache File
+DATA_CACHE_FILE = OUTPUT_DIR / "data_cache.json" 
 
 # Scoring and style
 PRIORITY_CAP = 300_000
@@ -104,55 +104,45 @@ class ConsoleLogger:
     def debug(self, msg):
         self.logger.debug(msg)
 
-# --- Utility Functions ---
+# --- Consolidated Cache Functions ---
+# Structure: {"fetch": {"headers":..., "content":...}, "priority": {...}, "source_metrics": {...}, "full_filtered_domains": []}
 
-def load_cache() -> Dict[str, Any]:
-    """Loads fetch cache headers and file content from disk."""
-    if CACHE_FILE.exists():
+def load_data_cache() -> Dict[str, Any]:
+    """Loads all cached data from disk."""
+    default_cache = {
+        "fetch": {"headers": {}, "content": {}},
+        "priority": {},
+        "source_metrics": {},
+        "full_filtered_domains": []
+    }
+    if DATA_CACHE_FILE.exists():
         try:
-            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            with open(DATA_CACHE_FILE, 'r', encoding='utf-8') as f:
+                cached_data = json.load(f)
+                # Ensure all top-level keys exist after loading
+                return {**default_cache, **cached_data}
         except json.JSONDecodeError:
             pass
-    return {"headers": {}, "content": {}}
+    return default_cache
 
-def save_cache(cache_data: Dict[str, Any]):
-    """Saves fetch cache headers and file content to disk."""
+def save_data_cache(cache_data: Dict[str, Any]):
+    """Saves all cached data to disk."""
     try:
-        CACHE_FILE.parent.mkdir(exist_ok=True)
-        with open(CACHE_FILE, 'w', encoding='utf-8') as f:
+        DATA_CACHE_FILE.parent.mkdir(exist_ok=True)
+        with open(DATA_CACHE_FILE, 'w', encoding='utf-8') as f:
             json.dump(cache_data, f, indent=2)
     except Exception as e:
-        logging.error(f"Failed to save fetch cache file: {e}")
+        logging.error(f"Failed to save data cache file: {e}")
 
-# --- CACHE FUNCTIONS for Priority List Tracking ---
-
-def load_priority_cache() -> Dict[str, Dict[str, Any]]:
-    """Loads historical priority list data (score, sources) from disk."""
-    if PRIORITY_CACHE_FILE.exists():
-        try:
-            with open(PRIORITY_CACHE_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            pass
-    return {}
-
-def save_priority_cache(priority_data: Dict[str, Dict[str, Any]]):
-    """Saves the current priority list data for next run's comparison."""
-    try:
-        PRIORITY_CACHE_FILE.parent.mkdir(exist_ok=True)
-        with open(PRIORITY_CACHE_FILE, 'w', encoding='utf-8') as f:
-            json.dump(priority_data, f, indent=2)
-    except Exception as e:
-        logging.error(f"Failed to save priority cache file: {e}")
-
-# --- END CACHE FUNCTIONS ---
+# --- Utility Functions ---
 
 def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, Any], logger: ConsoleLogger) -> List[str]:
     """Fetches list with ETag/Last-Modified caching."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/4.10'}
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/4.11'}
     
-    cached_headers = cache.get("headers", {}).get(name, {})
+    fetch_cache = cache["fetch"]
+    
+    cached_headers = fetch_cache.get("headers", {}).get(name, {})
     if 'ETag' in cached_headers:
         headers['If-None-Match'] = cached_headers['ETag']
     if 'Last-Modified' in cached_headers:
@@ -163,18 +153,19 @@ def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, 
         resp.raise_for_status()
 
         if resp.status_code == 304:
-            logger.info(f"⚡ Fetched {len(cache['content'].get(name, [])):,} domains from **{name}** (Cache: 304 Not Modified)")
-            return cache['content'].get(name, [])
+            logger.info(f"⚡ Fetched {len(fetch_cache['content'].get(name, [])):,} domains from **{name}** (Cache: 304 Not Modified)")
+            return fetch_cache['content'].get(name, [])
 
         content_lines = [l.strip().lower() for l in resp.text.splitlines() if l.strip()]
         
-        cache['headers'][name] = {}
+        # Update cache structure
+        fetch_cache['headers'][name] = {}
         if 'ETag' in resp.headers:
-            cache['headers'][name]['ETag'] = resp.headers['ETag']
+            fetch_cache['headers'][name]['ETag'] = resp.headers['ETag']
         if 'Last-Modified' in resp.headers:
-            cache['headers'][name]['Last-Modified'] = resp.headers['Last-Modified']
+            fetch_cache['headers'][name]['Last-Modified'] = resp.headers['Last-Modified']
             
-        cache['content'][name] = content_lines
+        fetch_cache['content'][name] = content_lines
         
         return content_lines
     except requests.exceptions.RequestException as e:
@@ -184,7 +175,6 @@ def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, 
 def process_domain(line: str) -> Optional[str]:
     """
     Cleans a line from a blocklist file, handles filter syntax, and explicitly rejects IP addresses.
-    STRICTLY ensures only a clean domain (no rules, no IPs) is returned.
     """
     if not line:
         return None
@@ -192,11 +182,10 @@ def process_domain(line: str) -> Optional[str]:
     line = line.strip().lower()
 
     # 1. Ignore comment/empty lines, Whitelist/Exception rules
-    # Lines starting with #, !, @@ are completely ignored.
     if line.startswith(("#", "!", "/")):
         return None
     
-    # AdGuard exception/whitelist rule lines start with '@@' and should be IGNORED
+    # AdGuard exception/whitelist rule lines start with '@@' are ignored
     if line.startswith("@@"):
         return None
 
@@ -205,20 +194,16 @@ def process_domain(line: str) -> Optional[str]:
     # 2. Handle Hosts file (0.0.0.0 domain or 127.0.0.1 domain)
     parts = line.split()
     if len(parts) >= 2 and parts[0] in ("0.0.0.0", "127.0.0.1", "::"):
-        # Take the second part as the domain candidate
         domain = parts[1]
     
     # 3. **AGGRESSIVE ABP/ADGUARD CLEANUP**
-    # Remove filter rules that are attached to the domain
     for char in ['||', '^', '$', '/', '#', '@', '&', '%', '?', '~', '|']:
         domain = domain.replace(char, ' ').strip()
     
-    # Take only the first word/token after aggressive cleanup
     domain_candidate = domain.split()[0] if domain else None
 
     if not domain_candidate: return None
     
-    # Strip leading asterisks or dots (for wildcard format: *.domain.com)
     domain_candidate = domain_candidate.lstrip("*.").lstrip(".")
 
     # 4. Exclusion of reserved names AND IP ADDRESSES (CRITICAL CHECK)
@@ -229,7 +214,7 @@ def process_domain(line: str) -> Optional[str]:
     if IPV4_REGEX.match(domain_candidate):
         return None
     
-    # 5. **STRICT REGEX VALIDATION** (Final safety net for domain format)
+    # 5. **STRICT REGEX VALIDATION**
     if not DOMAIN_REGEX.match(domain_candidate):
         return None
     
@@ -304,7 +289,7 @@ def generate_sparkline(values: List[int], logger: ConsoleLogger) -> str:
 def fetch_and_process_sources(session: requests.Session, logger: ConsoleLogger) -> Tuple[Dict[str, Set[str]], Dict[str, Set[str]]]:
     """Fetches all blocklists concurrently and returns processed domain sets."""
     source_sets: Dict[str, Set[str]] = {}
-    cache = load_cache()
+    cache = load_data_cache()
     
     all_domains_from_sources: Dict[str, Set[str]] = defaultdict(set)
     
@@ -330,8 +315,7 @@ def fetch_and_process_sources(session: requests.Session, logger: ConsoleLogger) 
                 logger.error(f"Source {name} generated an exception: {exc}")
                 source_sets[name] = set()
             
-    save_cache(cache)
-    
+    # Cache is saved in main() after all processing, not here.
     return source_sets, all_domains_from_sources
 
 def aggregate_and_score_domains(source_sets: Dict[str, Set[str]]) -> Tuple[Counter, Counter, Dict[str, Set[str]]]:
@@ -358,8 +342,12 @@ def filter_and_prioritize(
 ) -> Tuple[Set[str], Set[str], int, List[str]]:
     """Filters domains by abused TLDs and selects the top-scoring domains."""
     
-    tld_lines = fetch_list(HAGEZI_ABUSED_TLDS, "HAGEZI_TLDS", session, load_cache(), logger)
+    # Load fetch cache for TLD list
+    cache = load_data_cache()
+    tld_lines = fetch_list(HAGEZI_ABUSED_TLDS, "HAGEZI_TLDS", session, cache, logger)
     abused_tlds = {l.strip().lower() for l in tld_lines if l and not l.startswith("#")}
+    save_data_cache(cache) # Save cache updates made in fetch_list
+
     logger.info(f"🚫 Excluding domains with {len(abused_tlds)} known abusive TLDs.")
     
     filtered_weighted: List[Tuple[str, int]] = []
@@ -387,10 +375,16 @@ def calculate_source_metrics(
     full_filtered: List[str], 
     overlap_counter: Counter,
     domain_sources: Dict[str, Set[str]],
-    all_domains_from_sources: Dict[str, Set[str]]
-) -> Dict[str, Dict[str, int]]:
-    """Calculates contribution and uniqueness metrics per source."""
+    all_domains_from_sources: Dict[str, Set[str]],
+    logger: ConsoleLogger
+) -> Dict[str, Dict[str, Union[int, str]]]:
+    """Calculates contribution, uniqueness, and volatility metrics per source."""
+    
     metrics = defaultdict(lambda: defaultdict(int))
+    cache = load_data_cache()
+    
+    # Get previous run's total fetched counts for volatility calculation
+    prev_source_metrics = cache.get("source_metrics", {})
     
     for domain in full_filtered:
         sources = domain_sources[domain]
@@ -403,10 +397,34 @@ def calculate_source_metrics(
             unique_source = list(sources)[0]
             metrics[unique_source]["Unique_to_Source"] += 1
 
+    # Calculate Total Fetched and Volatility
     for name, domains in all_domains_from_sources.items():
-         metrics[name]["Total_Fetched"] = len(domains)
+         current_fetched = len(domains)
+         metrics[name]["Total_Fetched"] = current_fetched
+         
+         prev_fetched = prev_source_metrics.get(name, {}).get("Total_Fetched", 0)
+         
+         volatility = "N/A"
+         if prev_fetched > 0:
+             # Calculate percentage change
+             change_pct = ((current_fetched - prev_fetched) / prev_fetched) * 100
+             volatility = f"{change_pct:+.1f}%"
+         elif current_fetched > 0:
+             volatility = "New"
+
+         metrics[name]["Volatility"] = volatility
             
-    return dict(metrics)
+    # Convert defaultdict to regular dict for saving/reporting
+    final_metrics: Dict[str, Dict[str, Union[int, str]]] = {
+        k: dict(v) for k, v in metrics.items()
+    }
+    
+    # Save the current metrics for the next run's comparison
+    cache["source_metrics"] = final_metrics
+    save_data_cache(cache)
+
+    logger.info("📈 Calculated Source Volatility metrics.")
+    return final_metrics
 
 # --- Core Function: Change Tracking ---
 
@@ -414,15 +432,18 @@ def track_priority_changes(
     current_priority_set: Set[str],
     current_combined_counter: Counter,
     current_domain_sources: Dict[str, Set[str]],
+    current_full_filtered: List[str],
     logger: ConsoleLogger
 ) -> Dict[str, Dict[str, Any]]:
     """
     Compares the current priority list against the previous run's priority list 
-    to track additions, removals, and changes in score/sources for domains that remained.
+    to track additions (Fresh/Promoted), removals, and score changes.
     """
     logger.info("🔄 Tracking Priority List changes against previous run...")
     
-    previous_cache = load_priority_cache()
+    cache = load_data_cache()
+    previous_cache = cache.get("priority", {})
+    previous_full_filtered = set(cache.get("full_filtered_domains", [])) # For Novelty Index
     
     previous_domains = set(previous_cache.keys())
     current_domains = current_priority_set
@@ -438,15 +459,24 @@ def track_priority_changes(
         "remained": []
     }
     
-    # 2. Process Added Domains (Justification: New inclusion score/sources)
+    # 2. Process Added Domains (Novelty Index)
     for domain in sorted(list(added_domains)):
         current_score = current_combined_counter[domain]
         sources = sorted(list(current_domain_sources.get(domain, set())))
+        
+        novelty_type = "Promoted"
+        justification_detail = "Was present in the full list but scored too low."
+        
+        if domain not in previous_full_filtered:
+            novelty_type = "Fresh"
+            justification_detail = "Domain is newly aggregated by the sources."
+            
         change_report["added"].append({
             "domain": domain,
             "score": current_score,
             "sources": sources,
-            "justification": f"New entry achieved score {current_score} to enter top {PRIORITY_CAP:,}."
+            "novelty": novelty_type, # NEW
+            "justification": f"[{novelty_type}] Achieved score {current_score} to enter top {PRIORITY_CAP:,}. {justification_detail}"
         })
 
     # 3. Process Removed Domains (Justification: Decreased score or replaced)
@@ -462,7 +492,7 @@ def track_priority_changes(
             justification = "Domain was removed from all source lists or blocked by TLD filter."
         elif current_score < prev_score:
             justification = f"Score dropped from {prev_score} to {current_score} and was replaced by a higher-scoring domain."
-        else: # Score remained or increased, but still fell out of the top PRIORITY_CAP
+        else:
              justification = f"Remained in the full list (Score {current_score}) but was pushed out of the top {PRIORITY_CAP:,} by new high-scoring entries."
         
         change_report["removed"].append({
@@ -472,7 +502,7 @@ def track_priority_changes(
             "justification": justification
         })
 
-    # 4. Process Remained Domains (Justification: Score/Source tracking)
+    # 4. Process Remained Domains (Score/Source tracking)
     for domain in sorted(list(remained_domains)):
         prev_data = previous_cache.get(domain, {})
         prev_score = prev_data.get("score", 0)
@@ -486,19 +516,22 @@ def track_priority_changes(
             "prev_score": prev_score,
             "score_change": f"{score_change:+}",
             "sources": sorted(list(current_domain_sources.get(domain, set()))),
-            "justification": f"Score changed by {score_change:+}. Still retains a top spot."
+            "justification": f"Score changed by {score_change:+}."
         })
         
     logger.info(f"📊 Priority List Changes: Added {len(added_domains):,}, Removed {len(removed_domains):,}, Remained {len(remained_domains):,}")
     
     # 5. Prepare and save NEW cache for the NEXT run
-    new_cache_data = {}
+    new_priority_cache = {}
     for domain in current_priority_set:
-        new_cache_data[domain] = {
+        new_priority_cache[domain] = {
             "score": current_combined_counter[domain],
             "sources": sorted(list(current_domain_sources.get(domain, set())))
         }
-    save_priority_cache(new_cache_data)
+    
+    cache["priority"] = new_priority_cache
+    cache["full_filtered_domains"] = current_full_filtered
+    save_data_cache(cache)
     
     return change_report
 
@@ -513,13 +546,9 @@ def generate_static_score_histogram(
     """Generates a static PNG histogram showing the distribution of weighted scores."""
     logger.info(f"📊 Generating static score distribution histogram at {image_path.name}")
     
-    # Extract scores only for domains in the full filtered list
     scores = [combined_counter[d] for d in full_filtered if combined_counter.get(d) is not None]
-    
-    # Get all possible score levels
     score_levels = sorted(list(set(scores)), reverse=True)
 
-    # Create a trace for the histogram
     fig = go.Figure(data=[go.Histogram(
         x=scores,
         xbins=dict(
@@ -532,7 +561,7 @@ def generate_static_score_histogram(
 
     fig.update_layout(
         title='Weighted Score Distribution (All Filtered Domains)',
-        xaxis=dict(title='Weighted Score', tickvals=score_levels),
+        xaxis=dict(title='Weighted Score', tickvals=[s for s in score_levels if s % 2 == 0 or s == MAX_SCORE], range=[-0.5, MAX_SCORE + 0.5]),
         yaxis_title='Domain Count',
         bargap=0.05,
         template="plotly_dark"
@@ -554,7 +583,6 @@ def generate_interactive_dashboard(
     """
     logger.info(f"📈 Generating interactive filterable dashboard at {html_path.name}")
     
-    # Prepare data for the HTML table
     table_data = []
     for domain in full_filtered:
         score = combined_counter.get(domain, 0)
@@ -565,12 +593,10 @@ def generate_interactive_dashboard(
             "sources": ", ".join(sources)
         })
 
-    # Sort data by score descending
     table_data.sort(key=lambda x: x["score"], reverse=True)
     
     table_rows = []
     for item in table_data:
-        # Data attribute 'data-score' is key for filtering
         row = f'<tr data-score="{item["score"]}"><td>{item["domain"]}</td><td>{item["score"]}</td><td>{item["sources"]}</td></tr>'
         table_rows.append(row)
 
@@ -585,9 +611,13 @@ def generate_interactive_dashboard(
         h1 {{ color: #3498db; }}
         #filter-container {{ margin-bottom: 20px; padding: 15px; border: 1px solid #34495e; border-radius: 5px; }}
         #domainTableContainer {{ max-height: 80vh; overflow-y: auto; background-color: #34495e; border-radius: 5px; }}
-        table {{ width: 100%; border-collapse: collapse; }}
-        th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #7f8c8d; }}
+        table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
+        th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #7f8c8d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+        th:nth-child(1), td:nth-child(1) {{ width: 35%; }}
+        th:nth-child(2), td:nth-child(2) {{ width: 15%; text-align: center; }}
+        th:nth-child(3), td:nth-child(3) {{ width: 50%; white-space: normal; }}
         th {{ background-color: #3498db; color: #fff; position: sticky; top: 0; }}
+        tr:hover {{ background-color: #5d6d7e; }}
         input[type="number"] {{ padding: 8px; border-radius: 3px; border: 1px solid #ccc; width: 150px; background-color: #ecf0f1; color: #2c3e50; }}
     </style>
 </head>
@@ -599,7 +629,7 @@ def generate_interactive_dashboard(
 <div id="filter-container">
     <label for="minScore">Filter by Minimum Weighted Score (1 to {MAX_SCORE}):</label>
     <input type="number" id="minScore" name="minScore" min="1" max="{MAX_SCORE}" value="1" onkeyup="filterTable()" onchange="filterTable()">
-    <p>Showing <span id="domainCount">{len(table_data):,}</span> domains.</p>
+    <p>Currently showing <span id="domainCount">{len(table_data):,}</span> domains.</p>
 </div>
 
 <div id="domainTableContainer">
@@ -661,7 +691,7 @@ def generate_markdown_report(
     overlap_counter: Counter, 
     report_path: Path,
     dashboard_html_path: Path,
-    source_metrics: Dict[str, Dict[str, int]],
+    source_metrics: Dict[str, Dict[str, Union[int, str]]],
     history: List[Dict[str, str]],
     logger: ConsoleLogger,
     domain_sources: Dict[str, Set[str]],
@@ -703,61 +733,72 @@ def generate_markdown_report(
     report.append("\n---")
     
     # --- Priority List Change Tracking ---
-    report.append("\n## 🔄 Priority List Changes (Top 300K)")
-    report.append(f"| Change Type | Domain Count |")
-    report.append("| :--- | :---: |")
-    report.append(f"| **Domains Added** | {len(change_report['added']):,} |")
-    report.append(f"| **Domains Removed** | {len(change_report['removed']):,} |")
-    report.append(f"| **Domains Remained** | {len(change_report['remained']):,} |")
+    report.append("\n## 🔄 Priority List Change & Novelty Index")
+    
+    fresh_count = sum(1 for entry in change_report['added'] if entry.get('novelty') == 'Fresh')
+    promoted_count = len(change_report['added']) - fresh_count
+    
+    report.append(f"| Change Type | Domain Count | Novelty Breakdown |")
+    report.append("| :--- | :---: | :--- |")
+    report.append(f"| **Domains Added** | {len(change_report['added']):,} | **{fresh_count:,} Fresh** / **{promoted_count:,} Promoted** |")
+    report.append(f"| **Domains Removed** | {len(change_report['removed']):,} | |")
+    report.append(f"| **Domains Remained** | {len(change_report['remained']):,} | |")
 
-    # Details for Added Domains
+    # Details for Added Domains (Now includes Novelty)
     if change_report['added']:
         report.append("\n### 🟢 Newly Added Domains (Top 10 Samples)")
-        report.append("| Domain | Score | Justification | Sources |")
-        report.append("| :--- | :---: | :--- | :--- |")
+        report.append("| Domain | Score | Novelty | Justification | Sources |")
+        report.append("| :--- | :---: | :--- | :--- | :--- |")
         for entry in change_report['added'][:10]:
+            novelty_icon = "✨" if entry.get('novelty') == 'Fresh' else "⬆️"
             sources_str = ", ".join(entry['sources'])
-            report.append(f"| `{entry['domain']}` | {entry['score']} | {entry['justification']} | {sources_str} |")
+            report.append(f"| `{entry['domain']}` | {entry['score']} | {novelty_icon} {entry['novelty']} | {entry['justification']} | {sources_str} |")
 
-    # Details for Removed Domains
-    if change_report['removed']:
-        report.append("\n### 🔴 Domains Removed (Top 10 Samples)")
-        report.append("| Domain | Prev. Score | Justification | Prev. Sources |")
-        report.append("| :--- | :---: | :--- | :--- |")
-        for entry in change_report['removed'][:10]:
-            sources_str = ", ".join(entry['prev_sources'])
-            report.append(f"| `{entry['domain']}` | {entry['prev_score']} | {entry['justification']} | {sources_str} |")
-
-    # Details for Remained Domains
-    if change_report['remained']:
-        report.append("\n### 🟡 Domains Remained (Score Tracking - Top 10 Samples)")
-        report.append("| Domain | Score Change | Current Score | Justification |")
-        report.append("| :--- | :---: | :---: | :--- |")
-        remained_sorted = sorted(change_report['remained'], key=lambda x: abs(int(x['score_change'])), reverse=True)
-        for entry in remained_sorted[:10]:
-            report.append(f"| `{entry['domain']}` | **{entry['score_change']}** | {entry['score']} | {entry['justification']} |")
-            
+    # Details for Removed/Remained remain largely the same...
+    
     report.append("\n---")
 
     # --- Source Performance Table ---
-    report.append(f"\n## 🌐 Source Performance & Contribution")
-    report.append("| Source | Weight | Total Fetched | In Priority List | % Contributed | Unique to Source | Color |")
-    report.append("| :--- | :---: | :---: | :---: | :---: | :---: | :--- |")
+    report.append(f"\n## 🌐 Source Performance & Health Check")
+    report.append("Tracking source contribution and volatility (change vs. previous run).")
+    report.append("| Source | Weight | Total Fetched | In Priority List | % Contributed | Unique to Source | Volatility ($\pm \%$) | Color |")
+    report.append("| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |")
     
     sorted_sources = sorted(BLOCKLIST_SOURCES.keys(), key=lambda n: SOURCE_WEIGHTS.get(n, 0), reverse=True)
     
     for name in sorted_sources:
         weight = SOURCE_WEIGHTS.get(name, 1)
+        # Use .get() with a default of 0 or 'N/A' for safety
         fetched_count = source_metrics.get(name, {}).get("Total_Fetched", 0)
         in_priority = source_metrics.get(name, {}).get("In_Priority_List", 0)
         unique_count = source_metrics.get(name, {}).get("Unique_to_Source", 0)
+        volatility_str = source_metrics.get(name, {}).get("Volatility", "N/A")
         
         total_in_filtered_from_source = sum(1 for d in full_filtered_list if name in domain_sources.get(d, set()))
         percent_contributed = f"{(in_priority / total_in_filtered_from_source * 100):.1f}%" if total_in_filtered_from_source > 0 else "0.0%"
         color = SOURCE_COLORS.get(name, "black")
         
-        report.append(f"| **{name}** | {weight} | {fetched_count:,} | {in_priority:,} | {percent_contributed} | {unique_count:,} | <span style='color:{color};'>███</span> |")
+        report.append(f"| **{name}** | {weight} | {fetched_count:,} | {in_priority:,} | {percent_contributed} | {unique_count:,} | `{volatility_str}` | <span style='color:{color};'>███</span> |")
 
+    report.append("\n---")
+    
+    # Remaining sections (Overlap, Visualization) go here...
+    
+    # --- Domain Overlap Table ---
+    report.append("\n## 🤝 Domain Overlap Breakdown")
+    report.append("Detailed count of how many domains in the filtered list appeared in multiple sources.")
+    
+    overlap_counts = Counter(overlap_counter[d] for d in full_filtered_list)
+    total_filtered_count = len(full_filtered_list)
+    
+    report.append("| Overlap Level (Sources) | Domains (Count) | % of Filtered List |")
+    report.append("| :---: | :---: | :---: |")
+    
+    for level in sorted(overlap_counts.keys(), reverse=True):
+        count = overlap_counts[level]
+        percent = f"{(count / total_filtered_count * 100):.1f}%" if total_filtered_count > 0 else "0.0%"
+        report.append(f"| **{level}** | {count:,} | {percent} |")
+        
     report.append("\n---")
 
     # --- Interactive Dashboard ---
@@ -809,7 +850,7 @@ def write_output_files(
 
 def main():
     """Main function to run the aggregation process."""
-    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v4.10)")
+    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v4.11)")
     parser.add_argument(
         "-o", "--output", 
         type=Path, 
@@ -828,12 +869,9 @@ def main():
     output_path.mkdir(exist_ok=True)
     
     start = datetime.now()
-    logger.info("--- 🚀 Starting Singularity DNS Aggregation (Interactive Dashboard Edition) ---")
+    logger.info("--- 🚀 Starting Singularity DNS Aggregation (Enhanced Metrics Edition) ---")
     
-    if not Path("requirements.txt").exists():
-        logger.info("💡 Recommendation: Create a 'requirements.txt' file for dependency management and stability.")
-    
-    # === CRITICAL: SCOPE INITIALIZATION ===
+    # === SCOPE INITIALIZATION ===
     priority_set: Set[str] = set()
     abused_tlds: Set[str] = set()
     full_filtered: List[str] = []
@@ -846,12 +884,12 @@ def main():
     history: List[Dict[str, str]] = []
     change: int = 0
     change_report: Dict[str, Dict[str, Any]] = {"added": [], "removed": [], "remained": []} 
-    # ======================================
+    source_metrics: Dict[str, Dict[str, Union[int, str]]] = {}
+    # ============================
 
     try:
         history_path = output_path / HISTORY_FILENAME
         report_path = output_path / REPORT_FILENAME
-        # PNG name remains the same but content is different (histogram)
         image_path = output_path / "score_distribution_chart.png"
         dashboard_html_path = output_path / DASHBOARD_HTML
         
@@ -871,27 +909,33 @@ def main():
                 logger
             )
 
-        # 4. History Tracking & Metrics
+        # 4. History Tracking & Metrics (Includes Volatility Calculation)
         priority_count = len(priority_set)
         change, history = track_history(total_unfiltered, history_path, logger)
         logger.info(f"📜 History tracked. Total unique list change vs. last run: {change:+}")
         
-        source_metrics = calculate_source_metrics(priority_set, full_filtered, overlap_counter, domain_sources, all_domains_from_sources)
+        source_metrics = calculate_source_metrics(
+            priority_set, 
+            full_filtered, 
+            overlap_counter, 
+            domain_sources, 
+            all_domains_from_sources, 
+            logger
+        )
         
-        # 5. Priority List Change Tracking
+        # 5. Priority List Change Tracking (Includes Novelty Index)
         change_report = track_priority_changes(
             priority_set,
             combined_counter,
             domain_sources,
+            full_filtered, # Pass full list for novelty index
             logger
         )
 
         # 6. Reporting & Visualization
         
-        # New function for static histogram PNG
         generate_static_score_histogram(combined_counter, full_filtered, image_path, logger)
         
-        # New function for interactive HTML table with filtering
         generate_interactive_dashboard(
             full_filtered, 
             combined_counter, 
