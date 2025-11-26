@@ -1,11 +1,11 @@
 # 🛡️ Singularity DNS Blocklist Dashboard
-*Generated: 2025-11-26 13:28:45*
+*Generated: 2025-11-26 14:11:18*
 
 ## 📜 Aggregation Summary
 | Metric | Count | Insight |
 | :--- | :---: | :--- |
 | **Total Scored Domains** | **534,950** | Size of the list including TLD rejected entries. |
-| Change vs. Last Run | `+23` ⬆️ | Trend in the total unique domain pool. |
+| Change vs. Last Run | `+0` ➡️ | Trend in the total unique domain pool. |
 | Priority List Size | 300,000 | Capped domains selected (Cap: **300,000**). |
 | High Consensus (Score 6+) | 131,889 | Domains backed by strong weighted evidence. |
 | TLD Filter Exclusions | 66,285 | Domains rejected by the abusive TLD list. |
@@ -16,16 +16,16 @@
 These are the highest-scoring domains that failed to make the final list:
 | Domain | Weighted Score | Exclusion Reason |
 | :--- | :---: | :--- |
-| `stats.ozwebsites.biz` | <span style='color:red;'>**15**</span> | TLD Rejected: **.biz is marked as abusive.** |
-| `ad.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `zlp6s.pw` | <span style='color:red;'>**15**</span> | TLD Rejected: **.pw is marked as abusive.** |
-| `crosspromotion.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `adserve.work` | <span style='color:red;'>**15**</span> | TLD Rejected: **.work is marked as abusive.** |
 | `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
-| `ventureqb.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `grupoamerica.pe` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `aoiap.org` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `keyne-in.com.cn` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `sbcglkobal.net` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `zlp6s.pw` | <span style='color:red;'>**15**</span> | TLD Rejected: **.pw is marked as abusive.** |
+| `ad.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `stats.ozwebsites.biz` | <span style='color:red;'>**15**</span> | TLD Rejected: **.biz is marked as abusive.** |
+| `kiler96l.beget.tech` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `hc.baidu.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `secureusersbtbusiness123.weebly.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `favorer.weebly.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `3oil.wolkenmeer.ru` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
 
 *The complete list of 234,950 excluded domains is available in `excluded_domains_report.csv` for deeper analysis.*
 
