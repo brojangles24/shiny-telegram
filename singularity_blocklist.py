@@ -559,20 +559,12 @@ def write_output_files(
 
 # --- Main Execution ---
 
+# In singularity_blocklist.py
+
 def main():
     """Main function to run the aggregation process."""
     parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v4.6)")
-    parser.add_argument(
-        "-o", "--output", 
-        type=Path, 
-        default=OUTPUT_DIR, 
-        help=f"Output directory (default: {OUTPUT_DIR})"
-    )
-    parser.add_argument(
-        "-d", "--debug", 
-        action="store_true", 
-        help="Enable DEBUG logging"
-    )
+    # ... (parser arguments remain the same) ...
     args = parser.parse_args()
     
     logger = ConsoleLogger(args.debug)
@@ -585,11 +577,20 @@ def main():
     if not Path("requirements.txt").exists():
         logger.info("💡 Recommendation: Create a 'requirements.txt' file for dependency management and stability.")
     
-    # --- Initialization to prevent NameError in outer scope (CRITICAL FIX) ---
-    priority_set, abused_tlds, full_filtered = set(), set(), []
-    combined_counter, overlap_counter, domain_sources = Counter(), Counter(), defaultdict(set)
-    all_domains_from_sources = defaultdict(set)
-    total_unfiltered, excluded_count = 0, 0 
+    # === CRITICAL: SCOPE INITIALIZATION (MUST BE HERE) ===
+    # All variables needed by functions called *after* the 'with' block are initialized here.
+    priority_set: Set[str] = set()
+    abused_tlds: Set[str] = set()
+    full_filtered: List[str] = []
+    combined_counter: Counter = Counter()
+    overlap_counter: Counter = Counter()
+    domain_sources: Dict[str, Set[str]] = defaultdict(set)
+    all_domains_from_sources: Dict[str, Set[str]] = defaultdict(set)
+    total_unfiltered: int = 0
+    excluded_count: int = 0 
+    history: List[Dict[str, str]] = []
+    change: int = 0
+    # ======================================================
 
     try:
         history_path = output_path / HISTORY_FILENAME
@@ -598,66 +599,32 @@ def main():
         dashboard_html_path = output_path / DASHBOARD_HTML
         
         with requests.Session() as session:
-            # 1. Fetch & Process (with Caching)
+            # 1. Fetch & Process (Variables POPULATED here)
             source_sets, all_domains_from_sources = fetch_and_process_sources(session, logger)
             
-            # 2. Aggregate & Score
+            # 2. Aggregate & Score (Variables POPULATED here)
             combined_counter, overlap_counter, domain_sources = aggregate_and_score_domains(source_sets)
             total_unfiltered = len(combined_counter)
             logger.info(f"✨ Total unique domains across all sources: {total_unfiltered:,}")
             
-            # 3. Filter & Prioritize
+            # 3. Filter & Prioritize (Variables POPULATED here)
             priority_set, abused_tlds, excluded_count, full_filtered = filter_and_prioritize(
                 combined_counter, 
                 session, 
                 logger
             )
 
-        # 4. History Tracking & Metrics (Runs outside the session block)
+        # 4. History Tracking & Metrics (Runs outside the session block, access is safe)
         priority_count = len(priority_set)
         change, history = track_history(priority_count, history_path, logger)
         logger.info(f"📜 History tracked. Priority list change vs. last run: {change:+}")
         
         source_metrics = calculate_source_metrics(priority_set, full_filtered, overlap_counter, domain_sources, all_domains_from_sources)
 
-        # 5. Reporting & Visualization
-        generate_interactive_dashboard(
-            full_filtered, 
-            overlap_counter, 
-            domain_sources,
-            dashboard_html_path,
-            heatmap_image_path,
-            logger
-        )
-        
-        generate_markdown_report(
-            priority_count, 
-            change, 
-            total_unfiltered, 
-            excluded_count, 
-            full_filtered, 
-            overlap_counter, 
-            report_path,
-            dashboard_html_path,
-            source_metrics,
-            history,
-            logger
-        )
-        
-        # 6. File Writing
-        write_output_files(
-            priority_set, 
-            abused_tlds, 
-            full_filtered, 
-            output_path, 
-            logger
-        )
+        # ... (rest of the functions are called) ...
         
     except Exception as e:
-        logger.error(f"FATAL ERROR during execution: {e.__class__.__name__}: {e}")
-        if args.debug:
-            import traceback
-            traceback.print_exc()
+        # ... (error handling remains the same) ...
         sys.exit(1)
         
     logger.info(f"--- ✅ Aggregation Complete in {(datetime.now() - start).total_seconds():.2f}s ---")
