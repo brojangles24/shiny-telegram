@@ -4,6 +4,7 @@
 
 - **FINALIZED:** All advanced features (Async, Verbose, Dynamic Cap, IDN, Archiving) integrated.
 - **IMPROVEMENT:** Enhanced Metric Readability and Insight in Markdown Report (Top Excluded Domains).
+- **FIXED:** Corrected NameError in execution block.
 """
 import sys
 import csv
@@ -12,7 +13,7 @@ import argparse
 import json
 import re
 import asyncio
-import os # Added for testing
+import os 
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -28,6 +29,7 @@ try:
     import idna 
     from plotly.offline import plot
 except ImportError as e:
+    # This check is now just a safety net, as the calling environment handles the check.
     print(f"FATAL ERROR: Missing required library: {e.name}")
     print("Please run: pip install requests aiohttp plotly idna")
     sys.exit(1)
@@ -315,7 +317,13 @@ def filter_and_prioritize(
     combined_counter: Counter, logger: ConsoleLogger,
     priority_cap: int 
 ) -> Tuple[Set[str], Set[str], int, List[str], Counter, List[Dict[str, Any]]]:
-    """Filters domains by abused TLDs, selects top-scoring domains, and tracks excluded TLDs."""
+    """
+    Filters domains by abusive TLDs, selects top-scoring domains, and tracks excluded TLDs.
+    
+    NOTE: The FINAL output of this function (full_filtered) contains ONLY domains
+    that passed the TLD filter. This list is used to determine the Priority List
+    and the domain pool for the aggregated_full.txt file (which is the scored list).
+    """
     
     tld_lines = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.3'}).text.splitlines()
     abused_tlds = {l.strip().lower() for l in tld_lines if l.strip() and not l.startswith("#")}
@@ -333,6 +341,7 @@ def filter_and_prioritize(
         if tld in abused_tlds:
             excluded_count += 1
             tld_exclusion_counter[tld] += 1 
+            # These are domains excluded by the TLD check
             excluded_domains_verbose.append({
                 'domain': domain, 'score': weight, 'status': 'TLD EXCLUDED',
                 'reason': f'TLD .{tld} is marked as abusive.'
@@ -342,9 +351,13 @@ def filter_and_prioritize(
             
     filtered_weighted.sort(key=lambda x: x[1], reverse=True)
     
+    # The Priority List is the top N of the TLD-filtered list
     final_priority = {d for d, _ in filtered_weighted[:priority_cap]}
+    
+    # The full_filtered list is the entire scored pool *after* TLD exclusion.
     full_filtered = [d for d, _ in filtered_weighted] 
     
+    # Domains that pass the TLD filter but fail the score cap
     for domain, score in filtered_weighted[priority_cap:]:
         excluded_domains_verbose.append({
             'domain': domain, 'score': score, 'status': 'SCORE CUTOFF',
@@ -624,7 +637,7 @@ def generate_markdown_report(
     report_path: Path, dashboard_html_path: Path, source_metrics: Dict[str, Dict[str, Union[int, str]]],
     history: List[Dict[str, str]], logger: ConsoleLogger, domain_sources: Dict[str, Set[str]],
     change_report: Dict[str, Dict[str, Any]], tld_exclusion_counter: Counter, priority_cap_val: int,
-    excluded_domains_verbose: List[Dict[str, Any]] # ADDED ARGUMENT
+    excluded_domains_verbose: List[Dict[str, Any]] 
 ):
     """Creates a detailed, aesthetic Markdown report with enhanced metrics."""
     logger.info(f"📝 Generating Markdown report at {report_path.name}")
@@ -660,7 +673,6 @@ def generate_markdown_report(
         
         samples_to_show = []
         
-        # Collect top 5 TLD excluded domains
         tld_excluded.sort(key=lambda x: x['score'], reverse=True)
         for d in tld_excluded[:5]:
             samples_to_show.append({
@@ -669,7 +681,6 @@ def generate_markdown_report(
                 'reason': f"TLD Rejected: **{d['reason'].split('TLD ')[1]}**"
             })
             
-        # Collect top 5 score cutoff domains
         score_excluded.sort(key=lambda x: x['score'], reverse=True)
         for d in score_excluded[:5]:
              samples_to_show.append({
@@ -678,7 +689,6 @@ def generate_markdown_report(
                 'reason': f"Score Cutoff: **Needed >{priority_cap_val:,}**"
             })
         
-        # Sort by score and take the absolute top 10
         samples_to_show.sort(key=lambda x: x['score'], reverse=True)
 
         if samples_to_show:
@@ -843,7 +853,7 @@ def write_output_files(
     # 5. Full Aggregated List 
     unfiltered_file = output_path / UNFILTERED_FILENAME
     with open(unfiltered_file, "w", encoding="utf-8") as f:
-        f.write(f"# Full Aggregated List (Filtered by TLDs, Sorted by Score)\n# Generated: {now_str}\n# Total: {len(full_list):,}\n")
+        f.write(f"# Full Aggregated List (TLD-filtered, Scored)\n# Generated: {now_str}\n# Total: {len(full_list):,}\n")
         f.writelines(d + "\n" for d in full_list)
         
     logger.info(f"✅ Outputs written to: {output_path.resolve()}")
@@ -853,12 +863,12 @@ def run_tests(output_path, logger):
     logger.info("--- 🧪 Running Internal Integrity Tests ---")
     
     test_domains = {
-        "xn--fzc.com": "xn--fzc.com", # Already punycode
-        "bücher.de": "xn--bcher-kva.de", # Unicode -> Punycode
-        "google.com^$script": "google.com", # ABP cleanup
-        "0.0.0.0 bad.com": "bad.com", # Hosts file format
-        "1.2.3.4": None, # IPv4 rejection
-        "||tracker.com^": "tracker.com" # ABP full cleanup
+        "xn--fzc.com": "xn--fzc.com", 
+        "bücher.de": "xn--bcher-kva.de", 
+        "google.com^$script": "google.com", 
+        "0.0.0.0 bad.com": "bad.com", 
+        "1.2.3.4": None, 
+        "||tracker.com^": "tracker.com" 
     }
     
     passed = 0
@@ -877,6 +887,102 @@ def run_tests(output_path, logger):
     else:
         logger.error(f"❌ {passed}/{total} tests passed. Check logs for failures.")
         return 1
+
+# --- Main Execution ---
+def main():
+    """Main function to run the aggregation process."""
+    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.3)")
+    parser.add_argument("-o", "--output", type=Path, default=OUTPUT_DIR, help=f"Output directory (default: {OUTPUT_DIR})")
+    parser.add_argument("-d", "--debug", action="store_true", help="Enable DEBUG logging")
+    parser.add_argument("-p", "--priority-cap", type=int, default=PRIORITY_CAP_DEFAULT, help=f"Maximum size for the priority list (default: {PRIORITY_CAP_DEFAULT:,})")
+    parser.add_argument("-w", "--max-workers", type=int, default=MAX_WORKERS_DEFAULT, help=f"Maximum concurrent network workers (aiohttp limit, default: {MAX_WORKERS_DEFAULT})")
+    parser.add_argument("-v", "--verbose-report", action="store_true", help="Write a detailed CSV report of all excluded domains.")
+    parser.add_argument("-f", "--output-format", choices=['raw', 'hosts'], default='raw', help="Output format for the priority list ('raw' for Unbound/AdGuard DNS filter, 'hosts' for Pi-hole/etc.)")
+    parser.add_argument("--cleanup-cache", action="store_true", help=f"Delete old cache and archive files (> {CACHE_CLEANUP_DAYS} days).")
+    parser.add_argument("--test", action="store_true", help="Run internal integrity tests and exit.")
+    args = parser.parse_args()
+    
+    # --- Internal Test Suite ---
+    if args.test:
+        return run_tests(args.output, ConsoleLogger(args.debug))
+    # --- End Test Suite ---
+
+    logger = ConsoleLogger(args.debug)
+    output_path = args.output
+    output_path.mkdir(exist_ok=True)
+    
+    priority_cap_val = args.priority_cap
+    max_workers_val = args.max_workers
+    output_format_val = args.output_format
+    
+    start = datetime.now()
+    logger.info("--- 🚀 Starting Singularity DNS Aggregation (v5.3 - FINALIZED) ---")
+    
+    if args.cleanup_cache:
+        cleanup_old_files(output_path, logger)
+    
+    # === SCOPE INITIALIZATION ===
+    priority_set: Set[str] = set()
+    tld_exclusion_counter: Counter = Counter()
+    excluded_domains_verbose: List[Dict[str, Any]] = []
+    # ============================
+
+    try:
+        history_path = output_path / HISTORY_FILENAME
+        report_path = output_path / REPORT_FILENAME
+        image_path = output_path / "score_distribution_chart.png"
+        dashboard_html_path = output_path / DASHBOARD_HTML
+        
+        # 1. Fetch & Process (Run the async function)
+        source_sets, all_domains_from_sources = asyncio.run(fetch_and_process_sources_async(max_workers_val, logger))
+        
+        # 2. Aggregate & Score
+        combined_counter, overlap_counter, domain_sources = aggregate_and_score_domains(source_sets)
+        total_unfiltered = len(combined_counter)
+        
+        # 3. Filter & Prioritize
+        priority_set, abused_tlds, excluded_count, full_filtered, tld_exclusion_counter, excluded_domains_verbose = filter_and_prioritize(
+            combined_counter, logger, priority_cap_val
+        )
+
+        # 4. History Tracking & Metrics 
+        priority_count = len(priority_set)
+        change, history = track_history(total_unfiltered, history_path, logger)
+        source_metrics = calculate_source_metrics(
+            priority_set, full_filtered, overlap_counter, domain_sources, all_domains_from_sources, logger
+        )
+        
+        # 5. Priority List Change Tracking 
+        change_report = track_priority_changes(
+            priority_set, combined_counter, domain_sources, full_filtered, logger
+        )
+
+        # 6. Reporting & Visualization
+        generate_static_score_histogram(combined_counter, full_filtered, image_path, logger)
+        generate_interactive_dashboard(
+            full_filtered, combined_counter, domain_sources, dashboard_html_path, logger
+        )
+        generate_markdown_report(
+            priority_count, change, total_unfiltered, excluded_count, full_filtered, combined_counter,
+            overlap_counter, report_path, dashboard_html_path, source_metrics, history, logger,
+            domain_sources, change_report, tld_exclusion_counter, priority_cap_val, excluded_domains_verbose
+        )
+        
+        # 7. File Writing
+        write_output_files(
+            priority_set, abused_tlds, full_filtered, output_path, logger, priority_cap_val,
+            excluded_domains_verbose, args.verbose_report, output_format_val
+        )
+        
+    except Exception as e:
+        logger.error(f"FATAL ERROR during execution: {e.__class__.__name__}: {e}")
+        if args.debug:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+        
+    logger.info(f"--- ✅ Aggregation Complete in {(datetime.now() - start).total_seconds():.2f}s ---")
+
 
 if __name__ == "__main__":
     sys.exit(main())
