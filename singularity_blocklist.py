@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v5.8.2 - Robustness Fix)
+🚀 Singularity DNS Blocklist Aggregator (v5.8.3 - Docstring Fix)
 
-- **FIX:** Changed image placeholder strings to triple-quotes (""") to 
-         prevent 'unterminated string literal' errors from copy-paste.
+- **FIX:** Corrected docstring formatting to resolve 'unmatched )' SyntaxError.
 - **NEW METRIC:** Added Jaccard Similarity Matrix to measure list-to-list overlap.
 - **NEW METRIC:** Added Priority List TLD Composition (Top 15 TLDs).
 - **NEW VISUAL:** Added Historical Trend graph (historical_trend_chart.png).
@@ -17,13 +16,13 @@ import argparse
 import json
 import re
 import asyncio
-import os  # <-- ADDED for path/size checks
+import os
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List, Dict, Set, Optional, Tuple, Any, Union
-from itertools import combinations  # <-- ADDED for Jaccard Index
+from itertools import combinations
 
 # --- Dependency Check and Imports ---
 try:
@@ -76,7 +75,7 @@ HISTORY_FILENAME = "history.csv"
 REPORT_FILENAME = "metrics_report.md"
 DASHBOARD_HTML = "dashboard_html_removed.html"
 VERBOSE_EXCLUSION_FILE = "excluded_domains_report.csv"
-METRICS_CACHE_FILE = OUTPUT_DIR / "metrics_cache.json"  # <-- NEW: Lightweight cache file
+METRICS_CACHE_FILE = OUTPUT_DIR / "metrics_cache.json"
 
 # Scoring and style
 PRIORITY_CAP_DEFAULT = 300_000
@@ -114,7 +113,7 @@ class ConsoleLogger:
     def debug(self, msg): self.logger.debug(msg)
 
 
-# --- NEW: Lightweight Metrics Cache Functions ---
+# --- Lightweight Metrics Cache Functions ---
 def load_metrics_cache() -> Dict[str, Any]:
     """Loads only the source metrics cache from disk."""
     if METRICS_CACHE_FILE.exists():
@@ -123,7 +122,7 @@ def load_metrics_cache() -> Dict[str, Any]:
                 return json.load(f)
         except json.JSONDecodeError:
             pass
-    return {}  # Return empty dict if not found or corrupt
+    return {}
 
 def save_metrics_cache(metrics_data: Dict[str, Any]):
     """Saves only the source metrics cache to disk."""
@@ -207,7 +206,6 @@ def cleanup_old_files(output_path: Path, logger: ConsoleLogger):
         
         for item in directory.iterdir():
             if item.is_file():
-                # --- MODIFIED: Only clean non-archive files here ---
                 # Archive files are cleaned by the new size-based function
                 if directory == ARCHIVE_DIR and item.name.startswith("priority_"):
                     continue
@@ -405,7 +403,7 @@ def load_last_priority_from_archive(
 
 async def fetch_list(session: aiohttp.ClientSession, url: str, name: str, logger: ConsoleLogger) -> List[str]:
     """Fetches list using aiohttp and retries, without file caching."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.2'}
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.3'}
     
     for attempt in range(MAX_FETCH_RETRIES):
         try:
@@ -511,7 +509,7 @@ def filter_and_prioritize(
     """
     
     try:
-        tld_lines_req = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.2'})
+        tld_lines_req = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.3'})
         tld_lines_req.raise_for_status()
         tld_lines = tld_lines_req.text.splitlines()
         abused_tlds = {l.strip().lower() for l in tld_lines if l.strip() and not l.startswith("#")}
@@ -567,7 +565,7 @@ def calculate_source_metrics(
     priority_set: Set[str], full_list: List[str], overlap_counter: Counter, 
     domain_sources: Dict[str, Set[str]], all_domains_from_sources: Dict[str, Set[str]], 
     logger: ConsoleLogger,
-    old_source_metrics: Dict[str, Any]  # <-- ADDED ARG
+    old_source_metrics: Dict[str, Any]
 ) -> Dict[str, Dict[str, Union[int, str]]]:
     """Calculates contribution and uniqueness metrics per source (volatility is always 'New')."""
     
@@ -605,15 +603,13 @@ def calculate_source_metrics(
 # --- MODIFIED: track_priority_changes (Replaced Stub) ---
 def track_priority_changes(
     current_priority_set: Set[str], 
-    old_priority_set: Set[str], # <-- Pass in the set from the archive
+    old_priority_set: Set[str],
     logger: ConsoleLogger
-) -> Dict[str, List[Dict[str, Any]]]: # <-- Return lists of dicts
+) -> Dict[str, List[Dict[str, Any]]]:
     """Compares the new priority set against the cached old set."""
     
     if not old_priority_set:
         logger.warning("🚫 No previous priority list found. Reporting all domains as 'Added'.")
-        # We can't know what's 'Fresh' vs 'Promoted' without the old 'full_list'
-        # So we'll just label them all as 'added'
         added = [{'domain': d, 'novelty': 'Fresh'} for d in current_priority_set]
         return {"added": added, "removed": [], "remained": []}
 
@@ -624,8 +620,6 @@ def track_priority_changes(
     logger.info(f"🔄 Priority Change: {len(added_domains):,}+ added, {len(removed_domains):,}- removed, {len(remained_domains):,} remained.")
     
     # Format for the report
-    # We label all new as 'Fresh' for simplicity, as 'Promoted' would
-    # require caching the 'full_scored_list' which we are avoiding.
     change_report = {
         "added": [{'domain': d, 'novelty': 'Fresh'} for d in added_domains],
         "removed": [{'domain': d} for d in removed_domains],
@@ -726,8 +720,8 @@ def generate_markdown_report(
     history: List[Dict[str, str]], logger: ConsoleLogger, domain_sources: Dict[str, Set[str]],
     change_report: Dict[str, List[Dict[str, Any]]], tld_exclusion_counter: Counter, priority_cap_val: int,
     excluded_domains_verbose: List[Dict[str, Any]],
-    jaccard_matrix: Dict[str, Dict[str, float]], # <-- NEW ARG
-    priority_set: Set[str] # <-- NEW ARG (for TLD composition)
+    jaccard_matrix: Dict[str, Dict[str, float]],
+    priority_set: Set[str]
 ):
     """
     Creates a detailed, aesthetic Markdown report with enhanced metrics, 
@@ -736,7 +730,7 @@ def generate_markdown_report(
     logger.info(f"📝 Generating Markdown report at {report_path.name}")
     report: List[str] = []
     
-    report.append(f"# 🛡️ Singularity DNS Blocklist Dashboard (v5.8.2)")
+    report.append(f"# 🛡️ Singularity DNS Blocklist Dashboard (v5.8.3)")
     report.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
     
     trend_icon = "⬆️" if change > 0 else "⬇️" if change < 0 else "➡️"
@@ -808,12 +802,10 @@ def generate_markdown_report(
     # --- Priority List Change Tracking ---
     report.append("\n## 🔄 Priority List Change & Novelty Index")
     
-    # --- MODIFIED: Correctly parse the new change_report structure ---
     added_count = len(change_report.get('added', []))
     removed_count = len(change_report.get('removed', []))
     remained_count = len(change_report.get('remained', []))
     
-    # 'Fresh' is the only novelty type we can detect without a full cache
     fresh_count = sum(1 for entry in change_report.get('added', []) if entry.get('novelty') == 'Fresh')
     
     if added_count > 0 or removed_count > 0 or remained_count > 0:
@@ -951,7 +943,7 @@ def generate_markdown_report(
 # --- Main Execution ---
 def main():
     """Main function to run the aggregation process."""
-    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.8.2)")
+    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.8.3)")
     parser.add_argument("-o", "--output", type=Path, default=OUTPUT_DIR, help=f"Output directory (default: {OUTPUT_DIR})")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable DEBUG logging")
     parser.add_argument("-p", "--priority-cap", type=int, default=PRIORITY_CAP_DEFAULT, help=f"Maximum size for the priority list (default: {PRIORITY_CAP_DEFAULT:,})")
@@ -984,7 +976,7 @@ def main():
     output_format_val = args.output_format
     
     start = datetime.now()
-    logger.info("--- 🚀 Starting Singularity DNS Aggregation (v5.8.2 - ROBUSTNESS FIX) ---")
+    logger.info("--- 🚀 Starting Singularity DNS Aggregation (v5.8.3 - FINAL FIX) ---")
     
     if args.cleanup_cache:
         cleanup_old_files(output_path, logger)
@@ -1030,27 +1022,27 @@ def main():
         source_metrics = calculate_source_metrics(
             priority_set, full_list, overlap_counter, domain_sources, 
             all_domains_from_sources, logger, 
-            old_source_metrics  # <-- Pass old metrics
+            old_source_metrics
         )
         
         # 5. Priority List Change Tracking
         change_report = track_priority_changes(
             priority_set, 
-            old_priority_set,  # <-- Pass old priority set
+            old_priority_set,
             logger
         )
 
         # 6. Reporting & Visualization
         generate_static_score_histogram(combined_counter, full_list, image_path, logger)
-        generate_history_plot(history, image_path, logger) # <-- NEW plot
+        generate_history_plot(history, image_path, logger)
         
         generate_markdown_report(
             priority_count, change, total_unfiltered, excluded_count, full_list, combined_counter,
             overlap_counter, report_path, dashboard_html_path, source_metrics, history, logger,
             domain_sources, change_report, tld_exclusion_counter, priority_cap_val, 
             excluded_domains_verbose,
-            jaccard_matrix,  # <-- Pass Jaccard matrix
-            priority_set     # <-- Pass final priority set
+            jaccard_matrix,
+            priority_set
         )
         
         # 7. File Writing
