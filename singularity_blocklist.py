@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v4.8 - Final Metric Fix Edition)
+🚀 Singularity DNS Blocklist Aggregator (v4.10 - Interactive Dashboard Edition)
 
-- **CRITICAL FIX:** High Consensus Score calculation corrected to use weighted score.
-- **METRIC IMPROVEMENT:** Historical trend now tracks 'Total Unique Domains' instead of the fixed 'Priority List Size'.
-- ✅ ADGUARD_BASE INCLUDED: Added filters.adtidy.org/extension/chromium/filters/15.txt with Weight = 3.
+- **MAJOR CHANGE:** Overlap heatmap replaced with an interactive, filterable HTML table (dashboard.html).
+- **NEW FEATURE:** Users can filter all domains by minimum weighted score in the dashboard.
+- **IMPROVEMENT:** PNG output simplified to a Score Distribution Histogram for better readability.
 """
 import sys
 import csv
@@ -39,8 +39,7 @@ BLOCKLIST_SOURCES: Dict[str, str] = {
     "STEVENBLACK_HOSTS": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
     "ANUDEEP_ADSERVERS": "https://raw.githubusercontent.com/anudeepND/blacklist/master/adservers.txt",
     "ADAWAY_HOSTS": "https://adaway.org/hosts.txt",
-    # *** NEW ADGUARD SOURCE ADDED HERE ***
-    "ADGUARD_BASE": "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt",
+    "ADGUARD_BASE": "https://filters.adtidy.org/extension/chromium/filters/15.txt",
 }
 HAGEZI_ABUSED_TLDS: str = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/spam-tlds-onlydomains.txt"
 
@@ -51,15 +50,16 @@ REGEX_TLD_FILENAME = "regex_hagezi_tlds.txt"
 UNFILTERED_FILENAME = "aggregated_full.txt"
 HISTORY_FILENAME = "history.csv"
 REPORT_FILENAME = "metrics_report.md"
-HEATMAP_IMAGE = "overlap_heatmap_sources.png"
+HEATMAP_IMAGE = "overlap_heatmap_sources.png" # Renamed to score_distribution_chart.png later
 DASHBOARD_HTML = "dashboard.html"
 CACHE_FILE = OUTPUT_DIR / "fetch_cache.json"
+PRIORITY_CACHE_FILE = OUTPUT_DIR / "priority_cache.json" 
 
 # Scoring and style
 PRIORITY_CAP = 300_000
-CONSENSUS_THRESHOLD = 9 # Threshold for "High Consensus" domains
+CONSENSUS_THRESHOLD = 6 # Threshold for "High Consensus" domains
 
-# CUSTOM WEIGHTS: (Max Score is now 17)
+# CUSTOM WEIGHTS: (Max Score is 17)
 SOURCE_WEIGHTS: Dict[str, int] = {
     "HAGEZI_ULTIMATE": 4,
     "1HOSTS_LITE": 3,
@@ -67,7 +67,6 @@ SOURCE_WEIGHTS: Dict[str, int] = {
     "ANUDEEP_ADSERVERS": 2,
     "ADAWAY_HOSTS": 2,
     "STEVENBLACK_HOSTS": 1,
-    # *** NEW ADGUARD WEIGHT ADDED HERE ***
     "ADGUARD_BASE": 3,
 }
 MAX_SCORE = sum(SOURCE_WEIGHTS.values()) # 17
@@ -80,7 +79,6 @@ SOURCE_COLORS = {
     "STEVENBLACK_HOSTS": "#ff7f0e",
     "ANUDEEP_ADSERVERS": "#9467bd",
     "ADAWAY_HOSTS": "#8c564b",
-    # *** NEW ADGUARD COLOR ADDED ***
     "ADGUARD_BASE": "#17becf",
 }
 ASCII_SPARKLINE_CHARS = " ▂▃▄▅▆▇█"
@@ -109,7 +107,7 @@ class ConsoleLogger:
 # --- Utility Functions ---
 
 def load_cache() -> Dict[str, Any]:
-    """Loads cache headers and file content from disk."""
+    """Loads fetch cache headers and file content from disk."""
     if CACHE_FILE.exists():
         try:
             with open(CACHE_FILE, 'r', encoding='utf-8') as f:
@@ -119,17 +117,40 @@ def load_cache() -> Dict[str, Any]:
     return {"headers": {}, "content": {}}
 
 def save_cache(cache_data: Dict[str, Any]):
-    """Saves cache headers and file content to disk."""
+    """Saves fetch cache headers and file content to disk."""
     try:
         CACHE_FILE.parent.mkdir(exist_ok=True)
         with open(CACHE_FILE, 'w', encoding='utf-8') as f:
             json.dump(cache_data, f, indent=2)
     except Exception as e:
-        logging.error(f"Failed to save cache file: {e}")
+        logging.error(f"Failed to save fetch cache file: {e}")
+
+# --- CACHE FUNCTIONS for Priority List Tracking ---
+
+def load_priority_cache() -> Dict[str, Dict[str, Any]]:
+    """Loads historical priority list data (score, sources) from disk."""
+    if PRIORITY_CACHE_FILE.exists():
+        try:
+            with open(PRIORITY_CACHE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            pass
+    return {}
+
+def save_priority_cache(priority_data: Dict[str, Dict[str, Any]]):
+    """Saves the current priority list data for next run's comparison."""
+    try:
+        PRIORITY_CACHE_FILE.parent.mkdir(exist_ok=True)
+        with open(PRIORITY_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(priority_data, f, indent=2)
+    except Exception as e:
+        logging.error(f"Failed to save priority cache file: {e}")
+
+# --- END CACHE FUNCTIONS ---
 
 def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, Any], logger: ConsoleLogger) -> List[str]:
     """Fetches list with ETag/Last-Modified caching."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/4.8'}
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/4.10'}
     
     cached_headers = cache.get("headers", {}).get(name, {})
     if 'ETag' in cached_headers:
@@ -164,11 +185,6 @@ def process_domain(line: str) -> Optional[str]:
     """
     Cleans a line from a blocklist file, handles filter syntax, and explicitly rejects IP addresses.
     STRICTLY ensures only a clean domain (no rules, no IPs) is returned.
-    
-    Implements user-requested filtering:
-    - Ignores lines starting with #, !, or @@
-    - Removes || and ^ filter markers
-    - Ignores lines that are just IP addresses
     """
     if not line:
         return None
@@ -194,9 +210,6 @@ def process_domain(line: str) -> Optional[str]:
     
     # 3. **AGGRESSIVE ABP/ADGUARD CLEANUP**
     # Remove filter rules that are attached to the domain
-    # Remove all common filter markers: ||, ^, $, /, #, @, &, %, ?, ~, |
-    
-    # List of characters to remove/replace aggressively
     for char in ['||', '^', '$', '/', '#', '@', '&', '%', '?', '~', '|']:
         domain = domain.replace(char, ' ').strip()
     
@@ -229,7 +242,6 @@ def extract_tld(domain: str) -> Optional[str]:
 
 def track_history(count: int, history_path: Path, logger: ConsoleLogger) -> Tuple[int, List[Dict[str, str]]]:
     """Reads, updates, and writes the aggregation history, returning all history."""
-    # NOTE: The header now tracks Total_Unique_Domains (count) instead of Priority_Count
     HEADER = ["Date", "Total_Unique_Domains", "Change"]
     history: List[Dict[str, str]] = []
     last_count = 0
@@ -396,55 +408,247 @@ def calculate_source_metrics(
             
     return dict(metrics)
 
+# --- Core Function: Change Tracking ---
+
+def track_priority_changes(
+    current_priority_set: Set[str],
+    current_combined_counter: Counter,
+    current_domain_sources: Dict[str, Set[str]],
+    logger: ConsoleLogger
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Compares the current priority list against the previous run's priority list 
+    to track additions, removals, and changes in score/sources for domains that remained.
+    """
+    logger.info("🔄 Tracking Priority List changes against previous run...")
+    
+    previous_cache = load_priority_cache()
+    
+    previous_domains = set(previous_cache.keys())
+    current_domains = current_priority_set
+    
+    # 1. Classify Changes
+    added_domains = current_domains - previous_domains
+    removed_domains = previous_domains - current_domains
+    remained_domains = current_domains.intersection(previous_domains)
+    
+    change_report = {
+        "added": [],
+        "removed": [],
+        "remained": []
+    }
+    
+    # 2. Process Added Domains (Justification: New inclusion score/sources)
+    for domain in sorted(list(added_domains)):
+        current_score = current_combined_counter[domain]
+        sources = sorted(list(current_domain_sources.get(domain, set())))
+        change_report["added"].append({
+            "domain": domain,
+            "score": current_score,
+            "sources": sources,
+            "justification": f"New entry achieved score {current_score} to enter top {PRIORITY_CAP:,}."
+        })
+
+    # 3. Process Removed Domains (Justification: Decreased score or replaced)
+    for domain in sorted(list(removed_domains)):
+        prev_data = previous_cache.get(domain, {})
+        prev_score = prev_data.get("score", 0)
+        prev_sources = prev_data.get("sources", [])
+        
+        current_score = current_combined_counter.get(domain, 0)
+        
+        justification = ""
+        if current_score == 0:
+            justification = "Domain was removed from all source lists or blocked by TLD filter."
+        elif current_score < prev_score:
+            justification = f"Score dropped from {prev_score} to {current_score} and was replaced by a higher-scoring domain."
+        else: # Score remained or increased, but still fell out of the top PRIORITY_CAP
+             justification = f"Remained in the full list (Score {current_score}) but was pushed out of the top {PRIORITY_CAP:,} by new high-scoring entries."
+        
+        change_report["removed"].append({
+            "domain": domain,
+            "prev_score": prev_score,
+            "prev_sources": prev_sources,
+            "justification": justification
+        })
+
+    # 4. Process Remained Domains (Justification: Score/Source tracking)
+    for domain in sorted(list(remained_domains)):
+        prev_data = previous_cache.get(domain, {})
+        prev_score = prev_data.get("score", 0)
+        current_score = current_combined_counter[domain]
+        
+        score_change = current_score - prev_score
+        
+        change_report["remained"].append({
+            "domain": domain,
+            "score": current_score,
+            "prev_score": prev_score,
+            "score_change": f"{score_change:+}",
+            "sources": sorted(list(current_domain_sources.get(domain, set()))),
+            "justification": f"Score changed by {score_change:+}. Still retains a top spot."
+        })
+        
+    logger.info(f"📊 Priority List Changes: Added {len(added_domains):,}, Removed {len(removed_domains):,}, Remained {len(remained_domains):,}")
+    
+    # 5. Prepare and save NEW cache for the NEXT run
+    new_cache_data = {}
+    for domain in current_priority_set:
+        new_cache_data[domain] = {
+            "score": current_combined_counter[domain],
+            "sources": sorted(list(current_domain_sources.get(domain, set())))
+        }
+    save_priority_cache(new_cache_data)
+    
+    return change_report
+
 # --- Reporting and Visualization ---
+
+def generate_static_score_histogram(
+    combined_counter: Counter,
+    full_filtered: List[str],
+    image_path: Path,
+    logger: ConsoleLogger
+) -> Path:
+    """Generates a static PNG histogram showing the distribution of weighted scores."""
+    logger.info(f"📊 Generating static score distribution histogram at {image_path.name}")
+    
+    # Extract scores only for domains in the full filtered list
+    scores = [combined_counter[d] for d in full_filtered if combined_counter.get(d) is not None]
+    
+    # Get all possible score levels
+    score_levels = sorted(list(set(scores)), reverse=True)
+
+    # Create a trace for the histogram
+    fig = go.Figure(data=[go.Histogram(
+        x=scores,
+        xbins=dict(
+            start=0,
+            end=MAX_SCORE + 1,
+            size=1
+        ),
+        marker_color="#1f77b4"
+    )])
+
+    fig.update_layout(
+        title='Weighted Score Distribution (All Filtered Domains)',
+        xaxis=dict(title='Weighted Score', tickvals=score_levels),
+        yaxis_title='Domain Count',
+        bargap=0.05,
+        template="plotly_dark"
+    )
+
+    pio.write_image(fig, str(image_path), scale=1.5, width=900, height=600)
+    return image_path
 
 def generate_interactive_dashboard(
     full_filtered: List[str], 
-    overlap_counter: Counter, 
+    combined_counter: Counter, 
     domain_sources: Dict[str, Set[str]],
     html_path: Path,
-    image_path: Path,
     logger: ConsoleLogger
 ):
-    """Generates a Plotly stacked bar chart showing source overlap."""
-    logger.info(f"📈 Generating interactive weighted score dashboard at {html_path.name}")
+    """
+    Generates an interactive HTML page with a filterable table of all domains, 
+    their scores, and sources.
+    """
+    logger.info(f"📈 Generating interactive filterable dashboard at {html_path.name}")
     
-    sources = list(BLOCKLIST_SOURCES.keys())
-    overlap_levels = sorted(
-        {overlap_counter[d] for d in full_filtered}, 
-        reverse=True
-    )
-    heatmap_data: Dict[str, List[int]] = {src: [] for src in sources}
+    # Prepare data for the HTML table
+    table_data = []
+    for domain in full_filtered:
+        score = combined_counter.get(domain, 0)
+        sources = sorted(list(domain_sources.get(domain, set())))
+        table_data.append({
+            "domain": domain,
+            "score": score,
+            "sources": ", ".join(sources)
+        })
+
+    # Sort data by score descending
+    table_data.sort(key=lambda x: x["score"], reverse=True)
     
-    for level in overlap_levels:
-        domains_at_level = [d for d in full_filtered if overlap_counter[d] == level]
-        for src in sources:
-            count = sum(1 for d in domains_at_level if src in domain_sources.get(d, set()))
-            heatmap_data[src].append(count)
+    table_rows = []
+    for item in table_data:
+        # Data attribute 'data-score' is key for filtering
+        row = f'<tr data-score="{item["score"]}"><td>{item["domain"]}</td><td>{item["score"]}</td><td>{item["sources"]}</td></tr>'
+        table_rows.append(row)
+
+    html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Singularity DNS Interactive Dashboard</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; background-color: #2c3e50; color: #ecf0f1; padding: 20px; }}
+        h1 {{ color: #3498db; }}
+        #filter-container {{ margin-bottom: 20px; padding: 15px; border: 1px solid #34495e; border-radius: 5px; }}
+        #domainTableContainer {{ max-height: 80vh; overflow-y: auto; background-color: #34495e; border-radius: 5px; }}
+        table {{ width: 100%; border-collapse: collapse; }}
+        th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #7f8c8d; }}
+        th {{ background-color: #3498db; color: #fff; position: sticky; top: 0; }}
+        input[type="number"] {{ padding: 8px; border-radius: 3px; border: 1px solid #ccc; width: 150px; background-color: #ecf0f1; color: #2c3e50; }}
+    </style>
+</head>
+<body>
+
+<h1>Singularity DNS: Filterable Domain List</h1>
+<p>Total Filtered Domains: {len(table_data):,} | Max Score: {MAX_SCORE}</p>
+
+<div id="filter-container">
+    <label for="minScore">Filter by Minimum Weighted Score (1 to {MAX_SCORE}):</label>
+    <input type="number" id="minScore" name="minScore" min="1" max="{MAX_SCORE}" value="1" onkeyup="filterTable()" onchange="filterTable()">
+    <p>Showing <span id="domainCount">{len(table_data):,}</span> domains.</p>
+</div>
+
+<div id="domainTableContainer">
+    <table id="domainTable">
+        <thead>
+            <tr>
+                <th>Domain</th>
+                <th>Weighted Score</th>
+                <th>Sources</th>
+            </tr>
+        </thead>
+        <tbody>
+            {"".join(table_rows)}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    const tableBody = document.getElementById('domainTable').getElementsByTagName('tbody')[0];
+    const minScoreInput = document.getElementById('minScore');
+    const domainCountSpan = document.getElementById('domainCount');
+    
+    function filterTable() {{
+        const minScore = parseInt(minScoreInput.value) || 1;
+        let visibleCount = 0;
+
+        for (const row of tableBody.rows) {{
+            const rowScore = parseInt(row.getAttribute('data-score'));
             
-    fig = go.Figure()
-    for src in sources:
-        fig.add_trace(go.Bar(
-            x=[str(l) for l in overlap_levels],
-            y=heatmap_data[src],
-            name=src,
-            marker_color=SOURCE_COLORS.get(src, "black"),
-            hovertemplate="<b>Source:</b> %{name}<br><b>Overlap Level:</b> %{x}<br><b>Domains:</b> %{y:}<extra></extra>"
-        ))
-        
-    fig.update_layout(
-        barmode='stack',
-        title="Singularity DNS Domain Overlap Heatmap (Filtered List)",
-        xaxis_title="Number of Sources Domain Appears In",
-        yaxis_title="Domain Count (Filtered List)",
-        template="plotly_dark",
-        legend_title_text="Blocklist Source",
-        hovermode="x unified"
-    )
-    
-    pio.write_html(fig, str(html_path), auto_open=False, full_html=True, include_plotlyjs='cdn')
-    image_path = image_path.parent / "score_distribution_chart.png"
-    fig.write_image(str(image_path), scale=1) 
+            if (rowScore >= minScore) {{
+                row.style.display = '';
+                visibleCount++;
+            }} else {{
+                row.style.display = 'none';
+            }}
+        }}
+        domainCountSpan.textContent = visibleCount.toLocaleString();
+    }}
+
+    // Initialize filter on load
+    filterTable();
+</script>
+
+</body>
+</html>
+    """
+
+    with open(html_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
 
 
 def generate_markdown_report(
@@ -453,7 +657,7 @@ def generate_markdown_report(
     total_unfiltered: int, 
     excluded_count: int, 
     full_filtered_list: List[str], 
-    combined_counter: Counter,  # CRITICAL: Using the weighted counter for high consensus
+    combined_counter: Counter, 
     overlap_counter: Counter, 
     report_path: Path,
     dashboard_html_path: Path,
@@ -461,6 +665,7 @@ def generate_markdown_report(
     history: List[Dict[str, str]],
     logger: ConsoleLogger,
     domain_sources: Dict[str, Set[str]],
+    change_report: Dict[str, Dict[str, Any]],
 ):
     """Creates a detailed, aesthetic Markdown report with enhanced metrics."""
     logger.info(f"📝 Generating Markdown report at {report_path.name}")
@@ -472,7 +677,6 @@ def generate_markdown_report(
     trend_icon = "⬆️" if change > 0 else "⬇️" if change < 0 else "➡️"
     trend_color = "green" if change > 0 else "red" if change < 0 else "gray"
     
-    # CRITICAL FIX: Use combined_counter (WEIGHTED SCORE) for consensus metric
     high_consensus_count = sum(1 for d in full_filtered_list if combined_counter.get(d) >= CONSENSUS_THRESHOLD)
     
     # --- Historical Data ---
@@ -484,7 +688,6 @@ def generate_markdown_report(
 
     report.append(f"| Metric | Count | 7-Day Trend |")
     report.append("| :--- | :--- | :--- |")
-    # METRIC FIX: Tracking Total Unique Domains instead of fixed Priority Size
     report.append(f"| **Total Unique Domains** | **{total_unfiltered:,}** | <span style='color:{trend_color};'>`{change:+}` {trend_icon}</span> &nbsp; **{sparkline_str}** |")
     report.append(f"| **Trend Window** | {history_dates[0]} to {history_dates[-1]} | |")
     
@@ -499,6 +702,43 @@ def generate_markdown_report(
 
     report.append("\n---")
     
+    # --- Priority List Change Tracking ---
+    report.append("\n## 🔄 Priority List Changes (Top 300K)")
+    report.append(f"| Change Type | Domain Count |")
+    report.append("| :--- | :---: |")
+    report.append(f"| **Domains Added** | {len(change_report['added']):,} |")
+    report.append(f"| **Domains Removed** | {len(change_report['removed']):,} |")
+    report.append(f"| **Domains Remained** | {len(change_report['remained']):,} |")
+
+    # Details for Added Domains
+    if change_report['added']:
+        report.append("\n### 🟢 Newly Added Domains (Top 10 Samples)")
+        report.append("| Domain | Score | Justification | Sources |")
+        report.append("| :--- | :---: | :--- | :--- |")
+        for entry in change_report['added'][:10]:
+            sources_str = ", ".join(entry['sources'])
+            report.append(f"| `{entry['domain']}` | {entry['score']} | {entry['justification']} | {sources_str} |")
+
+    # Details for Removed Domains
+    if change_report['removed']:
+        report.append("\n### 🔴 Domains Removed (Top 10 Samples)")
+        report.append("| Domain | Prev. Score | Justification | Prev. Sources |")
+        report.append("| :--- | :---: | :--- | :--- |")
+        for entry in change_report['removed'][:10]:
+            sources_str = ", ".join(entry['prev_sources'])
+            report.append(f"| `{entry['domain']}` | {entry['prev_score']} | {entry['justification']} | {sources_str} |")
+
+    # Details for Remained Domains
+    if change_report['remained']:
+        report.append("\n### 🟡 Domains Remained (Score Tracking - Top 10 Samples)")
+        report.append("| Domain | Score Change | Current Score | Justification |")
+        report.append("| :--- | :---: | :---: | :--- |")
+        remained_sorted = sorted(change_report['remained'], key=lambda x: abs(int(x['score_change'])), reverse=True)
+        for entry in remained_sorted[:10]:
+            report.append(f"| `{entry['domain']}` | **{entry['score_change']}** | {entry['score']} | {entry['justification']} |")
+            
+    report.append("\n---")
+
     # --- Source Performance Table ---
     report.append(f"\n## 🌐 Source Performance & Contribution")
     report.append("| Source | Weight | Total Fetched | In Priority List | % Contributed | Unique to Source | Color |")
@@ -520,28 +760,11 @@ def generate_markdown_report(
 
     report.append("\n---")
 
-    # --- Domain Overlap Table ---
-    report.append("\n## 🤝 Domain Overlap Breakdown")
-    report.append("Detailed count of how many domains in the filtered list appeared in multiple sources.")
-    
-    overlap_counts = Counter(overlap_counter[d] for d in full_filtered_list)
-    total_filtered_count = len(full_filtered_list)
-    
-    report.append("| Overlap Level (Sources) | Domains (Count) | % of Filtered List |")
-    report.append("| :---: | :---: | :---: |")
-    
-    for level in sorted(overlap_counts.keys(), reverse=True):
-        count = overlap_counts[level]
-        percent = f"{(count / total_filtered_count * 100):.1f}%" if total_filtered_count > 0 else "0.0%"
-        report.append(f"| **{level}** | {count:,} | {percent} |")
-        
-    report.append("\n---")
-
     # --- Interactive Dashboard ---
     report.append("\n## 📈 Interactive Visualization")
-    report.append(f"The full interactive dashboard is available at: [`dashboard.html`](dashboard.html)")
-    report.append(f"\n### Static Preview")
-    report.append(f"![Weighted Score Distribution Chart](score_distribution_chart.png)")
+    report.append(f"The **Score-filterable Domain List** is available at: [`dashboard.html`](dashboard.html)")
+    report.append(f"\n### Static Score Distribution")
+    report.append(f"![Weighted Score Distribution Histogram](score_distribution_chart.png)")
     
     # Write the report
     with open(report_path, "w", encoding="utf-8") as f:
@@ -586,7 +809,7 @@ def write_output_files(
 
 def main():
     """Main function to run the aggregation process."""
-    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v4.7)")
+    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v4.10)")
     parser.add_argument(
         "-o", "--output", 
         type=Path, 
@@ -605,13 +828,12 @@ def main():
     output_path.mkdir(exist_ok=True)
     
     start = datetime.now()
-    logger.info("--- 🚀 Starting Singularity DNS Aggregation (Final Filtering Edition) ---")
+    logger.info("--- 🚀 Starting Singularity DNS Aggregation (Interactive Dashboard Edition) ---")
     
     if not Path("requirements.txt").exists():
         logger.info("💡 Recommendation: Create a 'requirements.txt' file for dependency management and stability.")
     
-    # === CRITICAL: SCOPE INITIALIZATION (MUST BE HERE) ===
-    # All variables needed by functions called *after* the execution are initialized here.
+    # === CRITICAL: SCOPE INITIALIZATION ===
     priority_set: Set[str] = set()
     abused_tlds: Set[str] = set()
     full_filtered: List[str] = []
@@ -623,48 +845,58 @@ def main():
     excluded_count: int = 0 
     history: List[Dict[str, str]] = []
     change: int = 0
-    # ======================================================
+    change_report: Dict[str, Dict[str, Any]] = {"added": [], "removed": [], "remained": []} 
+    # ======================================
 
     try:
         history_path = output_path / HISTORY_FILENAME
         report_path = output_path / REPORT_FILENAME
-        heatmap_image_path = output_path / "score_distribution_chart.png"
+        # PNG name remains the same but content is different (histogram)
+        image_path = output_path / "score_distribution_chart.png"
         dashboard_html_path = output_path / DASHBOARD_HTML
         
-        # We don't need a temporary source_sets placeholder as we use source_sets locally
-        
         with requests.Session() as session:
-            # 1. Fetch & Process (Variables POPULATED here)
+            # 1. Fetch & Process
             source_sets, all_domains_from_sources = fetch_and_process_sources(session, logger)
             
-            # 2. Aggregate & Score (Variables POPULATED here)
+            # 2. Aggregate & Score
             combined_counter, overlap_counter, domain_sources = aggregate_and_score_domains(source_sets)
             total_unfiltered = len(combined_counter)
             logger.info(f"✨ Total unique domains across all sources: {total_unfiltered:,}")
             
-            # 3. Filter & Prioritize (Variables POPULATED here)
+            # 3. Filter & Prioritize
             priority_set, abused_tlds, excluded_count, full_filtered = filter_and_prioritize(
                 combined_counter, 
                 session, 
                 logger
             )
 
-        # 4. History Tracking & Metrics (Runs outside the session block, access is safe)
+        # 4. History Tracking & Metrics
         priority_count = len(priority_set)
-        # Pass the total_unfiltered count to history tracker
         change, history = track_history(total_unfiltered, history_path, logger)
         logger.info(f"📜 History tracked. Total unique list change vs. last run: {change:+}")
         
-        # All required reporting variables are now populated and accessible
         source_metrics = calculate_source_metrics(priority_set, full_filtered, overlap_counter, domain_sources, all_domains_from_sources)
+        
+        # 5. Priority List Change Tracking
+        change_report = track_priority_changes(
+            priority_set,
+            combined_counter,
+            domain_sources,
+            logger
+        )
 
-        # 5. Reporting & Visualization
+        # 6. Reporting & Visualization
+        
+        # New function for static histogram PNG
+        generate_static_score_histogram(combined_counter, full_filtered, image_path, logger)
+        
+        # New function for interactive HTML table with filtering
         generate_interactive_dashboard(
             full_filtered, 
-            overlap_counter, 
+            combined_counter, 
             domain_sources,
             dashboard_html_path,
-            heatmap_image_path,
             logger
         )
         
@@ -674,17 +906,18 @@ def main():
             total_unfiltered, 
             excluded_count, 
             full_filtered, 
-            combined_counter, # Use combined_counter (weighted score)
+            combined_counter,
             overlap_counter, 
             report_path,
             dashboard_html_path,
             source_metrics,
             history,
             logger,
-            domain_sources, 
+            domain_sources,
+            change_report,
         )
         
-        # 6. File Writing
+        # 7. File Writing
         write_output_files(
             priority_set, 
             abused_tlds, 
