@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v4.7 - Final Debugged Edition)
+🚀 Singularity DNS Blocklist Aggregator (v4.8 - Final Metric Fix Edition)
 
-- **CRITICAL SCOPING FIX:** Variable initialization is made explicitly robust in main() to eliminate NameError.
+- **CRITICAL FIX:** High Consensus Score calculation corrected to use weighted score.
+- **METRIC IMPROVEMENT:** Historical trend now tracks 'Total Unique Domains' instead of the fixed 'Priority List Size'.
 - 🔥 ADGUARD_DNS REMOVED: Script uses 6 stable sources (Max Score = 14).
-- 🔒 Robust domain processing handles filter syntax and explicitly filters out IP addresses.
-- 📈 Generates rich Markdown reports with high consensus scoring (8+).
 """
 import sys
 import csv
@@ -124,7 +123,7 @@ def save_cache(cache_data: Dict[str, Any]):
 
 def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, Any], logger: ConsoleLogger) -> List[str]:
     """Fetches list with ETag/Last-Modified caching."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/4.7'}
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/4.8'}
     
     cached_headers = cache.get("headers", {}).get(name, {})
     if 'ETag' in cached_headers:
@@ -210,7 +209,8 @@ def extract_tld(domain: str) -> Optional[str]:
 
 def track_history(count: int, history_path: Path, logger: ConsoleLogger) -> Tuple[int, List[Dict[str, str]]]:
     """Reads, updates, and writes the aggregation history, returning all history."""
-    HEADER = ["Date", "Priority_Count", "Change"]
+    # NOTE: The header now tracks Total_Unique_Domains (count) instead of Priority_Count
+    HEADER = ["Date", "Total_Unique_Domains", "Change"]
     history: List[Dict[str, str]] = []
     last_count = 0
 
@@ -221,7 +221,7 @@ def track_history(count: int, history_path: Path, logger: ConsoleLogger) -> Tupl
                 if reader.fieldnames == HEADER:
                     history = list(reader)
                     if history:
-                        last_count = int(history[-1].get("Priority_Count", 0))
+                        last_count = int(history[-1].get("Total_Unique_Domains", 0))
         except Exception as e:
             logger.error(f"Failed to read history file: {e}")
 
@@ -229,10 +229,10 @@ def track_history(count: int, history_path: Path, logger: ConsoleLogger) -> Tupl
     today = datetime.now().strftime("%Y-%m-%d")
 
     if history and history[-1].get("Date") == today:
-        history[-1]["Priority_Count"] = str(count)
+        history[-1]["Total_Unique_Domains"] = str(count)
         history[-1]["Change"] = str(change)
     else:
-        history.append({"Date": today, "Priority_Count": str(count), "Change": str(change)})
+        history.append({"Date": today, "Total_Unique_Domains": str(count), "Change": str(change)})
 
     try:
         with open(history_path, "w", newline="", encoding="utf-8") as f:
@@ -311,7 +311,9 @@ def aggregate_and_score_domains(source_sets: Dict[str, Set[str]]) -> Tuple[Count
     for name, domains in source_sets.items():
         weight = SOURCE_WEIGHTS.get(name, 1)
         for d in domains:
-            combined_counter[d] += weight
+            # combined_counter stores the WEIGHTED SCORE
+            combined_counter[d] += weight 
+            # overlap_counter stores the RAW COUNT of sources
             overlap_counter[d] += 1
             domain_sources[d].add(name)
 
@@ -397,7 +399,7 @@ def generate_interactive_dashboard(
     for level in overlap_levels:
         domains_at_level = [d for d in full_filtered if overlap_counter[d] == level]
         for src in sources:
-            count = sum(1 for d in domains_at_level if src in domain_sources[d])
+            count = sum(1 for d in domains_at_level if src in domain_sources.get(d, set()))
             heatmap_data[src].append(count)
             
     fig = go.Figure()
@@ -431,13 +433,14 @@ def generate_markdown_report(
     total_unfiltered: int, 
     excluded_count: int, 
     full_filtered_list: List[str], 
+    combined_counter: Counter,  # CRITICAL: Using the weighted counter for high consensus
     overlap_counter: Counter, 
     report_path: Path,
     dashboard_html_path: Path,
     source_metrics: Dict[str, Dict[str, int]],
     history: List[Dict[str, str]],
     logger: ConsoleLogger,
-    domain_sources: Dict[str, Set[str]],  # Added domain_sources here for clarity
+    domain_sources: Dict[str, Set[str]],
 ):
     """Creates a detailed, aesthetic Markdown report with enhanced metrics."""
     logger.info(f"📝 Generating Markdown report at {report_path.name}")
@@ -449,18 +452,20 @@ def generate_markdown_report(
     trend_icon = "⬆️" if change > 0 else "⬇️" if change < 0 else "➡️"
     trend_color = "green" if change > 0 else "red" if change < 0 else "gray"
     
-    high_consensus_count = sum(1 for d in full_filtered_list if overlap_counter.get(d) >= CONSENSUS_THRESHOLD)
+    # CRITICAL FIX: Use combined_counter (WEIGHTED SCORE) for consensus metric
+    high_consensus_count = sum(1 for d in full_filtered_list if combined_counter.get(d) >= CONSENSUS_THRESHOLD)
     
     # --- Historical Data ---
     report.append(f"\n## 📜 Historical Trends")
     
-    history_counts = [int(h['Priority_Count']) for h in history][-7:]
+    history_counts = [int(h['Total_Unique_Domains']) for h in history][-7:]
     sparkline_str = generate_sparkline(history_counts, logger)
     history_dates = [h['Date'] for h in history][-7:]
 
     report.append(f"| Metric | Count | 7-Day Trend |")
     report.append("| :--- | :--- | :--- |")
-    report.append(f"| **Priority List Size** | **{priority_count:,}** | <span style='color:{trend_color};'>`{change:+}` {trend_icon}</span> &nbsp; **{sparkline_str}** |")
+    # METRIC FIX: Tracking Total Unique Domains instead of fixed Priority Size
+    report.append(f"| **Total Unique Domains** | **{total_unfiltered:,}** | <span style='color:{trend_color};'>`{change:+}` {trend_icon}</span> &nbsp; **{sparkline_str}** |")
     report.append(f"| **Trend Window** | {history_dates[0]} to {history_dates[-1]} | |")
     
     report.append("\n## 🔑 Summary Metrics")
@@ -470,7 +475,7 @@ def generate_markdown_report(
     report.append(f"| Domains with **High Consensus (Score {CONSENSUS_THRESHOLD}+)** | {high_consensus_count:,} | Highest consensus domains. |")
     
     report.append(f"| Domains Excluded by TLD Filter| {excluded_count:,} | TLD filter efficacy metric. |")
-    report.append(f"| Total Unique Domains (Pre-Filter) | {total_unfiltered:,} | Total candidates before TLD cleanup. |")
+    report.append(f"| Priority List Size | {priority_count:,} | Capped domains selected from full list. |")
 
     report.append("\n---")
     
@@ -587,6 +592,7 @@ def main():
     
     # === CRITICAL: SCOPE INITIALIZATION (MUST BE HERE) ===
     # All variables needed by functions called *after* the execution are initialized here.
+    # This guarantees the interpreter knows these variables exist in the main() scope.
     priority_set: Set[str] = set()
     abused_tlds: Set[str] = set()
     full_filtered: List[str] = []
@@ -606,7 +612,7 @@ def main():
         heatmap_image_path = output_path / "score_distribution_chart.png"
         dashboard_html_path = output_path / DASHBOARD_HTML
         
-        temp_source_sets = {} # Placeholder for results from the session block
+        # We don't need a temporary source_sets placeholder as we use source_sets locally
         
         with requests.Session() as session:
             # 1. Fetch & Process (Variables POPULATED here)
@@ -626,8 +632,9 @@ def main():
 
         # 4. History Tracking & Metrics (Runs outside the session block, access is safe)
         priority_count = len(priority_set)
-        change, history = track_history(priority_count, history_path, logger)
-        logger.info(f"📜 History tracked. Priority list change vs. last run: {change:+}")
+        # Pass the total_unfiltered count to history tracker
+        change, history = track_history(total_unfiltered, history_path, logger)
+        logger.info(f"📜 History tracked. Total unique list change vs. last run: {change:+}")
         
         # All required reporting variables are now populated and accessible
         source_metrics = calculate_source_metrics(priority_set, full_filtered, overlap_counter, domain_sources, all_domains_from_sources)
@@ -648,13 +655,14 @@ def main():
             total_unfiltered, 
             excluded_count, 
             full_filtered, 
+            combined_counter, # Use combined_counter (weighted score)
             overlap_counter, 
             report_path,
             dashboard_html_path,
             source_metrics,
             history,
             logger,
-            domain_sources, # Passed explicitly just to be 100% safe
+            domain_sources, 
         )
         
         # 6. File Writing
