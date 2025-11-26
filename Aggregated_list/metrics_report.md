@@ -1,5 +1,5 @@
 # 🛡️ Singularity DNS Blocklist Dashboard (v5.8.4)
-*Generated: 2025-11-26 15:40:08*
+*Generated: 2025-11-26 16:12:59*
 
 ## 📜 Aggregation Summary
 | Metric | Count | Insight |
@@ -16,16 +16,16 @@
 These are the highest-scoring domains that failed to make the final list:
 | Domain | Weighted Score | Exclusion Reason |
 | :--- | :---: | :--- |
+| `ad.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
 | `adop.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
 | `stats.ozwebsites.biz` | <span style='color:red;'>**15**</span> | TLD Rejected: **.biz is marked as abusive.** |
 | `crosspromotion.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
-| `zlp6s.pw` | <span style='color:red;'>**15**</span> | TLD Rejected: **.pw is marked as abusive.** |
-| `pub-4594170d59e1420294c17f88ab2fc81e.r2.dev` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
-| `gustavofalmeida.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
-| `certfspasl.fr` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
-| `fileam.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
-| `jiedu89.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `iphant.de` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `go.bestjacksonvillehotels.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `condehpita.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `greatcinh.firebaseapp.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `winmediaplayer.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
 
 *The complete list of 234,850 excluded domains is available in `excluded_domains_report.csv` for deeper analysis.*
 
@@ -51,9 +51,9 @@ Domains with these TLDs were excluded from the priority list.
 ## 🔄 Priority List Change & Novelty Index
 | Change Type | Domain Count | Novelty Breakdown |
 | :--- | :---: | :--- |
-| **Domains Added** | 16,979 | **16,979 Fresh** ✨ |
-| **Domains Removed** | 16,979 | |
-| **Domains Remained** | 283,021 | |
+| **Domains Added** | 17,056 | **17,056 Fresh** ✨ |
+| **Domains Removed** | 17,056 | |
+| **Domains Remained** | 282,944 | |
 
 ## 🌐 Source Performance & Health Check
 | Source | Category | Weight | Total Fetched | In Priority List | % List In Priority | Volatility ($\pm \%$) | Color |
@@ -108,21 +108,21 @@ The most common TLDs in the final `priority_300k.txt` list.
 
 | Rank | TLD | Domain Count | % of Priority List |
 | :---: | :--- | :---: | :---: |
-| 1 | **.com** | 181,308 | 60.44% |
-| 2 | **.net** | 24,055 | 8.02% |
-| 3 | **.de** | 7,426 | 2.48% |
-| 4 | **.org** | 6,521 | 2.17% |
-| 5 | **.xyz** | 6,043 | 2.01% |
-| 6 | **.ru** | 5,547 | 1.85% |
-| 7 | **.pro** | 4,980 | 1.66% |
-| 8 | **.fr** | 3,867 | 1.29% |
-| 9 | **.cn** | 3,699 | 1.23% |
-| 10 | **.br** | 3,631 | 1.21% |
-| 11 | **.io** | 3,578 | 1.19% |
-| 12 | **.info** | 3,056 | 1.02% |
-| 13 | **.jp** | 3,014 | 1.00% |
-| 14 | **.app** | 2,446 | 0.82% |
-| 15 | **.pl** | 2,262 | 0.75% |
+| 1 | **.com** | 181,389 | 60.46% |
+| 2 | **.net** | 24,090 | 8.03% |
+| 3 | **.de** | 7,435 | 2.48% |
+| 4 | **.org** | 6,556 | 2.19% |
+| 5 | **.xyz** | 6,023 | 2.01% |
+| 6 | **.ru** | 5,508 | 1.84% |
+| 7 | **.pro** | 4,950 | 1.65% |
+| 8 | **.fr** | 3,842 | 1.28% |
+| 9 | **.cn** | 3,723 | 1.24% |
+| 10 | **.br** | 3,627 | 1.21% |
+| 11 | **.io** | 3,528 | 1.18% |
+| 12 | **.info** | 3,028 | 1.01% |
+| 13 | **.jp** | 3,010 | 1.00% |
+| 14 | **.app** | 2,429 | 0.81% |
+| 15 | **.pl** | 2,255 | 0.75% |
 
 ---
 
