@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v5.5 - Structural Fix Edition)
+🚀 Singularity DNS Blocklist Aggregator (v5.6 - Complete Structural Resolution)
 
-- **CRITICAL FIX:** Structural reordering to eliminate NameError: name 'write_verbose_exclusion_report' is not defined.
-- **ALL FEATURES RETAINED:** Async, Punycode, TLD filtering, Dynamic Cap, Archiving.
+- **CRITICAL FIX:** Moved track_history function definition to resolve final NameError in execution flow.
+- **FINALIZED:** TLD-fix, Anti-bloat, Async, and Reporting are all confirmed.
 """
 import sys
 import csv
@@ -28,7 +28,6 @@ try:
     import idna 
     from plotly.offline import plot
 except ImportError as e:
-    # This check is now just a safety net, as the calling environment handles the check.
     print(f"FATAL ERROR: Missing required library: {e.name}")
     print("Please run: pip install requests aiohttp plotly idna")
     sys.exit(1)
@@ -70,7 +69,6 @@ UNFILTERED_FILENAME = "aggregated_full.txt"
 HISTORY_FILENAME = "history.csv"
 REPORT_FILENAME = "metrics_report.md"
 DASHBOARD_HTML = "dashboard_html_removed.html" 
-DATA_CACHE_FILE = OUTPUT_DIR / "data_cache.json" 
 VERBOSE_EXCLUSION_FILE = "excluded_domains_report.csv" 
 
 # Scoring and style
@@ -109,7 +107,6 @@ class ConsoleLogger:
     def debug(self, msg): self.logger.debug(msg)
 
 # --- Consolidated Cache Functions ---
-
 def load_data_cache() -> Dict[str, Any]:
     """Loads all cached data from disk."""
     default_cache = {
@@ -160,6 +157,40 @@ def extract_tld(domain: str) -> Optional[str]:
     """Extracts the simple TLD."""
     parts = domain.split(".")
     return parts[-1] if len(parts) >= 2 else None
+
+# MOVED HERE to ensure definition before main()
+def track_history(count: int, history_path: Path, logger: ConsoleLogger) -> Tuple[int, List[Dict[str, str]]]:
+    """Reads, updates, and writes the aggregation history, returning all history."""
+    HEADER = ["Date", "Total_Unique_Domains", "Change"]
+    history: List[Dict[str, str]] = []
+    last_count = 0
+
+    if history_path.exists():
+        try:
+            with open(history_path, "r", newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                if reader.fieldnames == HEADER:
+                    history = list(reader)
+                    if history: last_count = int(history[-1].get("Total_Unique_Domains", 0))
+        except Exception as e: logger.error(f"Failed to read history file: {e}")
+
+    change = count - last_count
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    if history and history[-1].get("Date") == today:
+        history[-1]["Total_Unique_Domains"] = str(count)
+        history[-1]["Change"] = str(change)
+    else:
+        history.append({"Date": today, "Total_Unique_Domains": str(count), "Change": str(change)})
+
+    try:
+        with open(history_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=HEADER)
+            writer.writeheader()
+            writer.writerows(history)
+    except Exception as e: logger.error(f"Failed to write history file: {e}")
+
+    return change, history
 
 # --- File Writing, Archiving, and Cleanup Functions (Structural Fix) ---
 
@@ -275,7 +306,7 @@ def write_output_files(
 
 async def fetch_list(session: aiohttp.ClientSession, url: str, name: str, logger: ConsoleLogger) -> List[str]:
     """Fetches list using aiohttp and retries, without file caching."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.5'}
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.6'}
     
     for attempt in range(MAX_FETCH_RETRIES):
         try:
@@ -380,7 +411,7 @@ def filter_and_prioritize(
     3. excluded_domains_verbose (for verbose report)
     """
     
-    tld_lines = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.5'}).text.splitlines()
+    tld_lines = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.6'}).text.splitlines()
     abused_tlds = {l.strip().lower() for l in tld_lines if l.strip() and not l.startswith("#")}
 
     logger.info(f"🚫 Excluding domains with {len(abused_tlds)} known abusive TLDs.")
@@ -625,8 +656,7 @@ def generate_markdown_report(
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(report))
 
-
-# --- Final Execution Block ---
+# --- Main Execution ---
 def main():
     """Main function to run the aggregation process."""
     parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.4)")
@@ -679,7 +709,7 @@ def main():
         combined_counter, overlap_counter, domain_sources = aggregate_and_score_domains(source_sets)
         total_unfiltered = len(combined_counter)
         
-        # 3. Filter & Prioritize (Returns full_list with ALL scored domains, including TLD rejected)
+        # 3. Filter & Prioritize
         priority_set, abused_tlds, excluded_count, full_list, tld_exclusion_counter, excluded_domains_verbose = filter_and_prioritize(
             combined_counter, logger, priority_cap_val
         )
