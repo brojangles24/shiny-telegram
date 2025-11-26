@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v5.4 - Anti-Bloat Edition)
+🚀 Singularity DNS Blocklist Aggregator (v5.4 - Aggregated Full Fix Edition)
 
-- **CRITICAL FIX:** Removed all cache file logic (data_cache.json) to prevent repository bloat.
-- **CRITICAL FIX:** Removed generation of interactive dashboard (dashboard.html) to prevent repository bloat.
-- **FEATURE RETENTION:** Priority List Change Tracking is disabled by removing cache access.
-- **ACTION REQUIRED:** You must manually delete the existing large files (data_cache.json, dashboard.html) from your repository history via git commands after deploying this script.
+- **CRITICAL FIX:** Corrected logic to ensure 'aggregated_full.txt' includes ALL scored domains,
+  including those rejected by the Hagezi TLD filter.
 """
 import sys
 import csv
@@ -14,7 +12,7 @@ import argparse
 import json
 import re
 import asyncio
-import os
+import os 
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -28,8 +26,7 @@ try:
     import plotly.graph_objects as go
     import plotly.io as pio
     import idna 
-    # Attempt to import plot to ensure Plotly is available
-    from plotly.offline import plot 
+    from plotly.offline import plot
 except ImportError as e:
     print(f"FATAL ERROR: Missing required library: {e.name}")
     print("Please run: pip install requests aiohttp plotly idna")
@@ -71,7 +68,7 @@ REGEX_TLD_FILENAME = "regex_hagezi_tlds.txt"
 UNFILTERED_FILENAME = "aggregated_full.txt"
 HISTORY_FILENAME = "history.csv"
 REPORT_FILENAME = "metrics_report.md"
-# DASHBOARD_HTML is removed as the file is too large
+DASHBOARD_HTML = "dashboard_html_removed.html" 
 VERBOSE_EXCLUSION_FILE = "excluded_domains_report.csv" 
 
 # Scoring and style
@@ -80,7 +77,6 @@ MAX_WORKERS_DEFAULT = 8
 CONSENSUS_THRESHOLD = 6 
 MAX_FETCH_RETRIES = 3 
 CACHE_CLEANUP_DAYS = 30 
-# DATA_CACHE_FILE removed here
 
 SOURCE_WEIGHTS: Dict[str, int] = {
     "HAGEZI_ULTIMATE": 4, "1HOSTS_LITE": 3, "OISD_BIG": 2, 
@@ -110,11 +106,34 @@ class ConsoleLogger:
     def error(self, msg): self.logger.error(msg)
     def debug(self, msg): self.logger.debug(msg)
 
-# --- CACHE FUNCTIONS REMOVED (data_cache.json) ---
+# --- Consolidated Cache Functions ---
+def load_data_cache() -> Dict[str, Any]:
+    """Loads all cached data from disk."""
+    default_cache = {
+        "fetch": {"headers": {}, "content": {}}, "priority": {},
+        "source_metrics": {}, "full_filtered_domains": []
+    }
+    DATA_CACHE_FILE = OUTPUT_DIR / "data_cache.json"
+    if DATA_CACHE_FILE.exists():
+        try:
+            with open(DATA_CACHE_FILE, 'r', encoding='utf-8') as f:
+                cached_data = json.load(f)
+                return {**default_cache, **cached_data}
+        except json.JSONDecodeError: pass
+    return default_cache
+
+def save_data_cache(cache_data: Dict[str, Any]):
+    """Saves all cached data to disk."""
+    DATA_CACHE_FILE = OUTPUT_DIR / "data_cache.json"
+    try:
+        DATA_CACHE_FILE.parent.mkdir(exist_ok=True)
+        with open(DATA_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(cache_data, f, indent=2)
+    except Exception as e:
+        logging.error(f"Failed to save data cache file: {e}")
 
 # --- Utility Functions ---
 
-# Modified fetch_list: No ETag/Last-Modified caching, just fetching/retrying
 async def fetch_list(session: aiohttp.ClientSession, url: str, name: str, logger: ConsoleLogger) -> List[str]:
     """Fetches list using aiohttp and retries, without file caching."""
     headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.4'}
@@ -232,7 +251,6 @@ def generate_sparkline(values: List[int], logger: ConsoleLogger) -> str:
 
 # --- Core Processing Functions ---
 
-# Modified fetch_and_process_sources_async: Removed cache dependency
 async def fetch_and_process_sources_async(max_workers: int, logger: ConsoleLogger) -> Tuple[Dict[str, Set[str]], Dict[str, Set[str]]]:
     """Manages concurrent fetching of all blocklists using aiohttp."""
     source_sets: Dict[str, Set[str]] = {}
@@ -241,7 +259,6 @@ async def fetch_and_process_sources_async(max_workers: int, logger: ConsoleLogge
     conn = aiohttp.TCPConnector(limit=max_workers)
     
     async with aiohttp.ClientSession(connector=conn) as session:
-        # Pass logger instead of cache
         tasks = [fetch_list(session, url, name, logger) for name, url in BLOCKLIST_SOURCES.items()]
         results = await asyncio.gather(*tasks)
 
@@ -269,29 +286,37 @@ def aggregate_and_score_domains(source_sets: Dict[str, Set[str]]) -> Tuple[Count
 
     return combined_counter, overlap_counter, domain_sources
 
-# Simplified filter_and_prioritize: Removed cache saving
+# CORRECTED FILTER_AND_PRIORITIZE
 def filter_and_prioritize(
     combined_counter: Counter, logger: ConsoleLogger,
     priority_cap: int 
 ) -> Tuple[Set[str], Set[str], int, List[str], Counter, List[Dict[str, Any]]]:
     """
-    Filters domains by abusive TLDs, selects top-scoring domains, and tracks excluded TLDs.
-    
-    The final output (full_filtered) contains ONLY domains that passed the TLD filter.
+    Filters domains by abusive TLDs for the priority list.
+    Returns: 
+    1. final_priority (TLD-filtered, capped list)
+    2. full_scored_list (ALL scored domains, including TLD-rejected)
+    3. excluded_domains_verbose (for verbose report)
     """
     
-    # Fetch TLD list synchronously
     tld_lines = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.4'}).text.splitlines()
     abused_tlds = {l.strip().lower() for l in tld_lines if l.strip() and not l.startswith("#")}
 
     logger.info(f"🚫 Excluding domains with {len(abused_tlds)} known abusive TLDs.")
     
-    filtered_weighted: List[Tuple[str, int]] = []
+    # 1. Create a list of ALL scored domains (domain, score) for the full report
+    # This list maintains TLD-rejected domains, sorted by score.
+    full_scored_list: List[Tuple[str, int]] = sorted(
+        combined_counter.items(), key=lambda x: x[1], reverse=True
+    )
+
+    # 2. Start the TLD filtering process to generate the PRIORITY LIST candidates
+    priority_candidates: List[Tuple[str, int]] = []
     excluded_count = 0
     tld_exclusion_counter = Counter() 
     excluded_domains_verbose: List[Dict[str, Any]] = []
 
-    for domain, weight in combined_counter.items():
+    for domain, weight in full_scored_list: # Iterate over the full scored list
         tld = extract_tld(domain)
         
         if tld in abused_tlds:
@@ -302,14 +327,15 @@ def filter_and_prioritize(
                 'reason': f'TLD .{tld} is marked as abusive.'
             })
         else:
-            filtered_weighted.append((domain, weight))
+            priority_candidates.append((domain, weight))
             
-    filtered_weighted.sort(key=lambda x: x[1], reverse=True)
+    # priority_candidates is already sorted by score from full_scored_list
+
+    # 3. Apply the priority cap to the TLD-filtered candidates
+    final_priority = {d for d, _ in priority_candidates[:priority_cap]}
     
-    final_priority = {d for d, _ in filtered_weighted[:priority_cap]}
-    full_filtered = [d for d, _ in filtered_weighted] 
-    
-    for domain, score in filtered_weighted[priority_cap:]:
+    # 4. Domains that passed TLD filter but failed the score cap
+    for domain, score in priority_candidates[priority_cap:]:
         excluded_domains_verbose.append({
             'domain': domain, 'score': score, 'status': 'SCORE CUTOFF',
             'reason': f'Scored {score} but did not make the top {priority_cap:,} list.'
@@ -318,18 +344,19 @@ def filter_and_prioritize(
     logger.info(f"🔥 Excluded {excluded_count:,} domains by TLD filter.")
     logger.info(f"💾 Priority list capped at {len(final_priority):,} domains.")
     
-    return final_priority, abused_tlds, excluded_count, full_filtered, tld_exclusion_counter, excluded_domains_verbose
+    # Return the full list including TLD rejected domains for the aggregated_full.txt file
+    return final_priority, abused_tlds, excluded_count, [d for d, _ in full_scored_list], tld_exclusion_counter, excluded_domains_verbose
 
-# Simplified calculate_source_metrics: Removed cache loading/saving
+
 def calculate_source_metrics(
-    priority_set: Set[str], full_filtered: List[str], overlap_counter: Counter,
+    priority_set: Set[str], full_list: List[str], overlap_counter: Counter, # Note: using full_list here which is the unfiltered list
     domain_sources: Dict[str, Set[str]], all_domains_from_sources: Dict[str, Set[str]], logger: ConsoleLogger
 ) -> Dict[str, Dict[str, Union[int, str]]]:
     """Calculates contribution and uniqueness metrics per source (volatility is always 'New')."""
     
     metrics = defaultdict(lambda: defaultdict(int))
     
-    for domain in full_filtered:
+    for domain in full_list:
         sources = domain_sources[domain]
         if domain in priority_set:
             for source in sources: metrics[source]["In_Priority_List"] += 1
@@ -340,7 +367,7 @@ def calculate_source_metrics(
     for name, domains in all_domains_from_sources.items():
          current_fetched = len(domains)
          metrics[name]["Total_Fetched"] = current_fetched
-         metrics[name]["Volatility"] = "N/A" # Volatility tracking disabled due to lack of cache
+         metrics[name]["Volatility"] = "N/A" 
             
     final_metrics: Dict[str, Dict[str, Union[int, str]]] = {k: dict(v) for k, v in metrics.items()}
     logger.info("📈 Calculated Source Metrics (Volatility disabled).")
@@ -353,20 +380,17 @@ def track_priority_changes(
 ) -> Dict[str, Dict[str, Any]]:
     """Placeholder: Change tracking is disabled due to the removal of cache files."""
     logger.info("🚫 Priority Change Tracking (Novelty/Remained) is DISABLED. Requires data_cache.json.")
-    # Return empty structure for the report generation to prevent errors
     return {"added": [], "removed": [], "remained": []}
 
 
 # --- Reporting and Visualization ---
 
-# Kept generate_static_score_histogram, removed interactive dashboard
-
 def generate_static_score_histogram(
-    combined_counter: Counter, full_filtered: List[str], image_path: Path, logger: ConsoleLogger
+    combined_counter: Counter, full_list: List[str], image_path: Path, logger: ConsoleLogger
 ) -> Path:
     """Generates a static PNG histogram showing the distribution of weighted scores."""
     logger.info(f"📊 Generating static score distribution histogram at {image_path.name}")
-    scores = [combined_counter[d] for d in full_filtered if combined_counter.get(d) is not None]
+    scores = [combined_counter[d] for d in full_list if combined_counter.get(d) is not None]
     score_levels = sorted(list(set(scores)), reverse=True)
 
     fig = go.Figure(data=[go.Histogram(
@@ -374,7 +398,7 @@ def generate_static_score_histogram(
     )])
 
     fig.update_layout(
-        title='Weighted Score Distribution (All Filtered Domains)',
+        title='Weighted Score Distribution (All Scored Domains)',
         xaxis=dict(title='Weighted Score', tickvals=[s for s in score_levels if s % 2 == 0 or s == MAX_SCORE], range=[-0.5, MAX_SCORE + 0.5]),
         yaxis_title='Domain Count', bargap=0.05, template="plotly_dark"
     )
@@ -382,32 +406,9 @@ def generate_static_score_histogram(
     pio.write_image(fig, str(image_path), scale=1.5, width=900, height=600)
     return image_path
 
-# generate_interactive_dashboard function removed due to file size limits.
-
-def write_verbose_exclusion_report(
-    excluded_domains: List[Dict[str, Any]], output_path: Path, logger: ConsoleLogger
-):
-    """Writes a CSV file containing all domains that failed to make the Priority List."""
-    
-    if not excluded_domains:
-        logger.info("Skipping verbose report: No domains excluded by TLD filter or score cutoff.")
-        return
-
-    csv_path = output_path / VERBOSE_EXCLUSION_FILE
-    
-    try:
-        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-            fieldnames = ['domain', 'score', 'status', 'reason']
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(excluded_domains)
-        logger.info(f"💾 Verbose exclusion report written: {csv_path.name} ({len(excluded_domains):,} entries)")
-    except Exception as e:
-        logger.error(f"Failed to write verbose exclusion report: {e}")
-
 def generate_markdown_report(
     priority_count: int, change: int, total_unfiltered: int, excluded_count: int, 
-    full_filtered_list: List[str], combined_counter: Counter, overlap_counter: Counter, 
+    full_list: List[str], combined_counter: Counter, overlap_counter: Counter, 
     report_path: Path, dashboard_html_path: Path, source_metrics: Dict[str, Dict[str, Union[int, str]]],
     history: List[Dict[str, str]], logger: ConsoleLogger, domain_sources: Dict[str, Set[str]],
     change_report: Dict[str, Dict[str, Any]], tld_exclusion_counter: Counter, priority_cap_val: int,
@@ -422,15 +423,14 @@ def generate_markdown_report(
     
     trend_icon = "⬆️" if change > 0 else "⬇️" if change < 0 else "➡️"
     trend_color = "green" if change > 0 else "red" if change < 0 else "gray"
-    high_consensus_count = sum(1 for d in full_filtered_list if combined_counter.get(d) >= CONSENSUS_THRESHOLD)
+    high_consensus_count = sum(1 for d in full_list if combined_counter.get(d) >= CONSENSUS_THRESHOLD)
     
     # --- Historical Data & Summary Metrics ---
     report.append(f"\n## 📜 Aggregation Summary")
     
-    # Combined Summary/Historical Table
     report.append("| Metric | Count | Insight |")
     report.append("| :--- | :---: | :--- |")
-    report.append(f"| **Total Unique Domains** | **{total_unfiltered:,}** | Overall size of the unfiltered, validated pool. |")
+    report.append(f"| **Total Scored Domains** | **{len(full_list):,}** | Size of the list including TLD rejected entries. |") # Use len(full_list) now
     report.append(f"| Change vs. Last Run | `{change:+}` {trend_icon} | Trend in the total unique domain pool. |")
     report.append(f"| Priority List Size | {priority_count:,} | Capped domains selected (Cap: **{priority_cap_val:,}**). |")
     report.append(f"| High Consensus (Score {CONSENSUS_THRESHOLD}+) | {high_consensus_count:,} | Domains backed by strong weighted evidence. |")
@@ -528,7 +528,7 @@ def generate_markdown_report(
                 elif change_pct <= -25.0: color_style = "color:red;"
             except ValueError: pass
         else:
-             volatility_display = "N/A" # Clear volatility if cache is missing
+             volatility_display = "N/A" 
 
         source_color = SOURCE_COLORS.get(name, "black")
         
@@ -562,7 +562,6 @@ def cleanup_old_files(output_path: Path, logger: ConsoleLogger):
         
         for item in directory.iterdir():
             if item.is_file():
-                # Check for archives and history/cache files (though cache is now removed)
                 if item.name.endswith(".txt") or item.name.endswith(".json") or item.name.endswith(".csv"):
                     mod_time = datetime.fromtimestamp(item.stat().st_mtime)
                     if mod_time < cutoff_date:
@@ -602,7 +601,7 @@ def write_output_files(
     output_path.mkdir(exist_ok=True, parents=True)
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    # 1. Priority List
+    # 1. Priority List (TLD-filtered and capped)
     priority_file = output_path / PRIORITY_FILENAME
     
     if output_format == 'hosts':
@@ -630,10 +629,10 @@ def write_output_files(
         f.write(f"# Hagezi Abused TLDs Regex List\n# Generated: {now_str}\n# Total: {len(abused_tlds):,}\n")
         f.writelines(f"\\.{t}$\n" for t in sorted(abused_tlds))
         
-    # 5. Full Aggregated List 
+    # 5. Full Aggregated List (ALL scored domains, including TLD rejected)
     unfiltered_file = output_path / UNFILTERED_FILENAME
     with open(unfiltered_file, "w", encoding="utf-8") as f:
-        f.write(f"# Full Aggregated List (TLD-filtered, Scored)\n# Generated: {now_str}\n# Total: {len(full_list):,}\n")
+        f.write(f"# Full Aggregated List (ALL Scored Domains, Sorted by Score)\n# Generated: {now_str}\n# Total: {len(full_list):,}\n")
         f.writelines(d + "\n" for d in full_list)
         
     logger.info(f"✅ Outputs written to: {output_path.resolve()}")
@@ -671,7 +670,7 @@ def run_tests(output_path, logger):
 # --- Main Execution ---
 def main():
     """Main function to run the aggregation process."""
-    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.3)")
+    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.4)")
     parser.add_argument("-o", "--output", type=Path, default=OUTPUT_DIR, help=f"Output directory (default: {OUTPUT_DIR})")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable DEBUG logging")
     parser.add_argument("-p", "--priority-cap", type=int, default=PRIORITY_CAP_DEFAULT, help=f"Maximum size for the priority list (default: {PRIORITY_CAP_DEFAULT:,})")
@@ -696,7 +695,7 @@ def main():
     output_format_val = args.output_format
     
     start = datetime.now()
-    logger.info("--- 🚀 Starting Singularity DNS Aggregation (v5.3 - FINALIZED) ---")
+    logger.info("--- 🚀 Starting Singularity DNS Aggregation (v5.4 - CORRECTED) ---")
     
     if args.cleanup_cache:
         cleanup_old_files(output_path, logger)
@@ -706,14 +705,13 @@ def main():
     tld_exclusion_counter: Counter = Counter()
     excluded_domains_verbose: List[Dict[str, Any]] = []
     change_report: Dict[str, Dict[str, Any]] = {"added": [], "removed": [], "remained": []} 
-    # NOTE: Change tracking will be empty due to lack of cache, but the structure is needed for the report.
     # ============================
 
     try:
         history_path = output_path / HISTORY_FILENAME
         report_path = output_path / REPORT_FILENAME
         image_path = output_path / "score_distribution_chart.png"
-        dashboard_html_path = output_path / "dashboard_html_removed.html" # Placeholder to keep report logic clean
+        dashboard_html_path = output_path / "dashboard_html_removed.html" 
         
         # 1. Fetch & Process (Run the async function)
         source_sets, all_domains_from_sources = asyncio.run(fetch_and_process_sources_async(max_workers_val, logger))
@@ -722,8 +720,8 @@ def main():
         combined_counter, overlap_counter, domain_sources = aggregate_and_score_domains(source_sets)
         total_unfiltered = len(combined_counter)
         
-        # 3. Filter & Prioritize
-        priority_set, abused_tlds, excluded_count, full_filtered, tld_exclusion_counter, excluded_domains_verbose = filter_and_prioritize(
+        # 3. Filter & Prioritize (Returns full_list with TLD-rejected domains)
+        priority_set, abused_tlds, excluded_count, full_list, tld_exclusion_counter, excluded_domains_verbose = filter_and_prioritize(
             combined_counter, logger, priority_cap_val
         )
 
@@ -731,25 +729,26 @@ def main():
         priority_count = len(priority_set)
         change, history = track_history(total_unfiltered, history_path, logger)
         source_metrics = calculate_source_metrics(
-            priority_set, full_filtered, overlap_counter, domain_sources, all_domains_from_sources, logger
+            priority_set, full_list, overlap_counter, domain_sources, all_domains_from_sources, logger
         )
         
-        # 5. Priority List Change Tracking (Returns empty change set since cache is gone)
-        # Note: We pass the empty change_report initialization to prevent errors.
-        
+        # 5. Priority List Change Tracking (Will report 0 changes as cache is absent)
+        change_report = track_priority_changes(
+            priority_set, combined_counter, domain_sources, full_list, logger
+        )
+
         # 6. Reporting & Visualization
-        generate_static_score_histogram(combined_counter, full_filtered, image_path, logger)
-        # generate_interactive_dashboard removed!
+        generate_static_score_histogram(combined_counter, full_list, image_path, logger)
         
         generate_markdown_report(
-            priority_count, change, total_unfiltered, excluded_count, full_filtered, combined_counter,
+            priority_count, change, total_unfiltered, excluded_count, full_list, combined_counter,
             overlap_counter, report_path, dashboard_html_path, source_metrics, history, logger,
             domain_sources, change_report, tld_exclusion_counter, priority_cap_val, excluded_domains_verbose
         )
         
         # 7. File Writing
         write_output_files(
-            priority_set, abused_tlds, full_filtered, output_path, logger, priority_cap_val,
+            priority_set, abused_tlds, full_list, output_path, logger, priority_cap_val,
             excluded_domains_verbose, args.verbose_report, output_format_val
         )
         
