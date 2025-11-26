@@ -1,21 +1,37 @@
 # 🛡️ Singularity DNS Blocklist Dashboard
-*Generated: 2025-11-26 04:10:00*
+*Generated: 2025-11-26 04:19:57*
 
-## 📜 Historical Trends
-| Metric | Count | 7-Day Trend |
-| :--- | :--- | :--- |
-| **Total Unique Domains** | **534,610** | <span style='color:green;'>`+19` ⬆️</span> &nbsp; **█** |
-
-## 🔑 Summary Metrics
-| Metric | Count | Details |
-| :--- | :--- | :--- |
-| Domains with **High Consensus (Score 6+)** | 99,443 | Highest consensus domains. |
-| Domains Excluded by TLD Filter| 66,078 | TLD filter efficacy metric. |
-| Priority List Size | 300,000 | Capped domains selected from full list (Cap: **300,000**). |
+## 📜 Aggregation Summary
+| Metric | Count | Insight |
+| :--- | :---: | :--- |
+| **Total Unique Domains** | **534,610** | Overall size of the unfiltered, validated pool. |
+| Change vs. Last Run | `+0` ➡️ | Trend in the total unique domain pool. |
+| Priority List Size | 300,000 | Capped domains selected (Cap: **300,000**). |
+| High Consensus (Score 6+) | 99,443 | Domains backed by strong weighted evidence. |
+| TLD Filter Exclusions | 66,078 | Domains rejected by the abusive TLD list. |
 
 ---
 
-## 🚫 Top 10 Excluded Abusive TLDs (Malicious Trend Insight)
+## ⚠️ Top Excluded Domains for Audit (High Score / TLD Rejection)
+These are the highest-scoring domains that failed to make the final list:
+| Domain | Weighted Score | Exclusion Reason |
+| :--- | :---: | :--- |
+| `crosspromotion.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `stats.ozwebsites.biz` | <span style='color:red;'>**15**</span> | TLD Rejected: **.biz is marked as abusive.** |
+| `adserve.work` | <span style='color:red;'>**15**</span> | TLD Rejected: **.work is marked as abusive.** |
+| `ad.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `adop.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
+| `zlp6s.pw` | <span style='color:red;'>**15**</span> | TLD Rejected: **.pw is marked as abusive.** |
+| `push-notifications.top` | <span style='color:red;'>**14**</span> | TLD Rejected: **.top is marked as abusive.** |
+| `special-offers.online` | <span style='color:red;'>**14**</span> | TLD Rejected: **.online is marked as abusive.** |
+| `dgafgadsgkjg.top` | <span style='color:red;'>**14**</span> | TLD Rejected: **.top is marked as abusive.** |
+
+*The complete list of 234,610 excluded domains is available in `excluded_domains_report.csv` for deeper analysis.*
+
+---
+
+## 🚫 Top 10 Abusive TLD Trends
 | Rank | Abusive TLD | Excluded Domain Count |
 | :---: | :--- | :---: |
 | 1 | **.top** | 7,911 |
@@ -34,18 +50,18 @@
 ## 🔄 Priority List Change & Novelty Index
 | Change Type | Domain Count | Novelty Breakdown |
 | :--- | :---: | :--- |
-| **Domains Added** | 17,211 | **340 Fresh** / **16,871 Promoted** |
+| **Domains Added** | 16,987 | **0 Fresh** ✨ / **16,987 Promoted** ⬆️ |
 
 ## 🌐 Source Performance & Health Check
-| Source | Category | Weight | Total Fetched | In Priority List | % Contributed | Unique to Source | Volatility ($\pm \%$) | Color |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **HAGEZI_ULTIMATE** | Aggregated/Wildcard | 4 | 232,363 | 186,085 | 100.0% | 89,062 | <span style='color:green;'>`+0.1%`</span> | <span style='color:#d62728;'>███</span> |
-| **1HOSTS_LITE** | Aggregated/Wildcard | 3 | 92,483 | 79,145 | 100.0% | 19,108 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#2ca02c;'>███</span> |
-| **ADGUARD_BASE** | ABP Rule List | 3 | 119,141 | 98,631 | 100.0% | 41,732 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#17becf;'>███</span> |
-| **OISD_BIG** | Aggregated/Wildcard | 2 | 215,379 | 99,179 | 52.8% | 109,585 | <span style='color:green;'>`-0.0%`</span> | <span style='color:#1f77b4;'>███</span> |
-| **ANUDEEP_ADSERVERS** | Specialized (Ads) | 2 | 42,347 | 7,045 | 16.8% | 34,928 | <span style='color:green;'>`-0.0%`</span> | <span style='color:#9467bd;'>███</span> |
-| **ADAWAY_HOSTS** | Specialized (Ads) | 2 | 6,540 | 6,488 | 99.8% | 10 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#8c564b;'>███</span> |
-| **STEVENBLACK_HOSTS** | Hosts File (Legacy) | 1 | 97,120 | 37,732 | 45.6% | 44,977 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#ff7f0e;'>███</span> |
+| Source | Category | Weight | Total Fetched | In Priority List | Volatility ($\pm \%$) | Color |
+| :--- | :--- | :---: | :---: | :---: | :---: | :--- |
+| **HAGEZI_ULTIMATE** | Aggregated/Wildcard | 4 | 232,363 | 186,085 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#d62728;'>███</span> |
+| **1HOSTS_LITE** | Aggregated/Wildcard | 3 | 92,483 | 79,145 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#2ca02c;'>███</span> |
+| **ADGUARD_BASE** | ABP Rule List | 3 | 119,141 | 98,631 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#17becf;'>███</span> |
+| **OISD_BIG** | Aggregated/Wildcard | 2 | 215,379 | 99,179 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#1f77b4;'>███</span> |
+| **ANUDEEP_ADSERVERS** | Specialized (Ads) | 2 | 42,347 | 7,045 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#9467bd;'>███</span> |
+| **ADAWAY_HOSTS** | Specialized (Ads) | 2 | 6,540 | 6,488 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#8c564b;'>███</span> |
+| **STEVENBLACK_HOSTS** | Hosts File (Legacy) | 1 | 97,120 | 37,732 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#ff7f0e;'>███</span> |
 
 ---
 
