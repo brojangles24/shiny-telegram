@@ -328,7 +328,7 @@ def write_output_files(
     priority_file = output_path / PRIORITY_FILENAME
     
     if output_format == 'hosts':
-        prefix = "0.0.0.0 "
+        prefix = ""
         header = f"# Hosts File Priority {priority_cap_val} Blocklist (Actual size: {len(priority_set):,})\n# Generated: {now_str}\n"
     else: # Default is raw/unbound
         prefix = ""
