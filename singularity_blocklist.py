@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v5.8.1 - Syntax Fix)
+🚀 Singularity DNS Blocklist Aggregator (v5.8.2 - Robustness Fix)
 
-- **FIX:** Corrected a SyntaxError in generate_markdown_report where image 
-         placeholders were not inside 'report.append()' strings.
-- **FIX:** Corrected a SyntaxWarning for an invalid escape sequence in a 
-         Markdown table header.
+- **FIX:** Changed image placeholder strings to triple-quotes (""") to 
+         prevent 'unterminated string literal' errors from copy-paste.
 - **NEW METRIC:** Added Jaccard Similarity Matrix to measure list-to-list overlap.
 - **NEW METRIC:** Added Priority List TLD Composition (Top 15 TLDs).
 - **NEW VISUAL:** Added Historical Trend graph (historical_trend_chart.png).
-- **CHANGE TRACKING (FIXED):** Implemented lightweight change tracking:
-    - Uses a tiny 'metrics_cache.json' for source list size volatility.
-    - Reads the most recent 'archive/' file for domain Add/Remove/Remained stats.
-- **NEW FEATURE:** Added --archive-limit-mb (default 50) to auto-clean the archive 
-                 by size, deleting the oldest files first.
+- **CHANGE TRACKING (FIXED):** Implemented lightweight change tracking.
+- **NEW FEATURE:** Added --archive-limit-mb (default 50) to auto-clean archive.
 """
 import sys
 import csv
@@ -410,7 +405,7 @@ def load_last_priority_from_archive(
 
 async def fetch_list(session: aiohttp.ClientSession, url: str, name: str, logger: ConsoleLogger) -> List[str]:
     """Fetches list using aiohttp and retries, without file caching."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.1'}
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.2'}
     
     for attempt in range(MAX_FETCH_RETRIES):
         try:
@@ -516,7 +511,7 @@ def filter_and_prioritize(
     """
     
     try:
-        tld_lines_req = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.1'})
+        tld_lines_req = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.2'})
         tld_lines_req.raise_for_status()
         tld_lines = tld_lines_req.text.splitlines()
         abused_tlds = {l.strip().lower() for l in tld_lines if l.strip() and not l.startswith("#")}
@@ -741,7 +736,7 @@ def generate_markdown_report(
     logger.info(f"📝 Generating Markdown report at {report_path.name}")
     report: List[str] = []
     
-    report.append(f"# 🛡️ Singularity DNS Blocklist Dashboard (v5.8.1)")
+    report.append(f"# 🛡️ Singularity DNS Blocklist Dashboard (v5.8.2)")
     report.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
     
     trend_icon = "⬆️" if change > 0 else "⬇️" if change < 0 else "➡️"
@@ -874,11 +869,11 @@ def generate_markdown_report(
     # --- NEW: Jaccard Similarity Matrix ---
     report.append("\n## 🖇️ List Similarity Matrix (Jaccard Index)")
     report.append("Measures the overlap between lists (Intersection / Union). A high value (e.g., 0.85) means the lists are very redundant.")
-    # --- SYNTAXERROR FIX: Moved image tag inside report.append() ---
-    report.append("
+    # --- ROBUSTNESS FIX: Changed to triple-quotes ---
+    report.append("""
 
 [Image of a data heatmap for correlation]
-")
+""")
     
     matrix_sources = sorted(jaccard_matrix.keys())
     # Create Header
@@ -923,11 +918,11 @@ def generate_markdown_report(
     # --- NEW: Priority List TLD Composition ---
     report.append("\n## 📊 Priority List Composition (Top 15 TLDs)")
     report.append("The most common TLDs in the final `priority_300k.txt` list.")
-    # --- SYNTAXERROR FIX: Moved image tag inside report.append() ---
-    report.append("
+    # --- ROBUSTNESS FIX: Changed to triple-quotes ---
+    report.append("""
 
 [Image of a vertical bar chart]
-")
+""")
     
     priority_tld_counter = Counter(extract_tld(d) for d in priority_set if extract_tld(d))
     
@@ -942,11 +937,11 @@ def generate_markdown_report(
     
     # --- Interactive Dashboard ---
     report.append("\n## 📈 Interactive Visualization")
-    # --- SYNTAXERROR FIX: Moved image tag inside report.append() ---
-    report.append("
+    # --- ROBUSTNESS FIX: Changed to triple-quotes ---
+    report.append("""
 
 [Image of a time series line graph]
-")
+""")
     report.append(f"See `historical_trend_chart.png` and `score_distribution_chart.png`.")
     
     # Write the report
@@ -956,7 +951,7 @@ def generate_markdown_report(
 # --- Main Execution ---
 def main():
     """Main function to run the aggregation process."""
-    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.8.1)")
+    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.8.2)")
     parser.add_argument("-o", "--output", type=Path, default=OUTPUT_DIR, help=f"Output directory (default: {OUTPUT_DIR})")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable DEBUG logging")
     parser.add_argument("-p", "--priority-cap", type=int, default=PRIORITY_CAP_DEFAULT, help=f"Maximum size for the priority list (default: {PRIORITY_CAP_DEFAULT:,})")
@@ -989,7 +984,7 @@ def main():
     output_format_val = args.output_format
     
     start = datetime.now()
-    logger.info("--- 🚀 Starting Singularity DNS Aggregation (v5.8.1 - SYNTAX FIX) ---")
+    logger.info("--- 🚀 Starting Singularity DNS Aggregation (v5.8.2 - ROBUSTNESS FIX) ---")
     
     if args.cleanup_cache:
         cleanup_old_files(output_path, logger)
