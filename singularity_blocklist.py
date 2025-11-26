@@ -40,7 +40,7 @@ BLOCKLIST_SOURCES: Dict[str, str] = {
     "ANUDEEP_ADSERVERS": "https://raw.githubusercontent.com/anudeepND/blacklist/master/adservers.txt",
     "ADAWAY_HOSTS": "https://adaway.org/hosts.txt",
     # *** NEW ADGUARD SOURCE ADDED HERE ***
-    "ADGUARD_BASE": "https://filters.adtidy.org/extension/chromium/filters/15.txt",
+    "ADGUARD_BASE": "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt",
 }
 HAGEZI_ABUSED_TLDS: str = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/spam-tlds-onlydomains.txt"
 
