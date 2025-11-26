@@ -1,5 +1,5 @@
 # 🛡️ Singularity DNS Blocklist Dashboard
-*Generated: 2025-11-26 06:16:43*
+*Generated: 2025-11-26 07:11:32*
 
 ## 📜 Aggregation Summary
 | Metric | Count | Insight |
@@ -18,14 +18,14 @@ These are the highest-scoring domains that failed to make the final list:
 | :--- | :---: | :--- |
 | `adserve.work` | <span style='color:red;'>**15**</span> | TLD Rejected: **.work is marked as abusive.** |
 | `crosspromotion.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `ad.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
 | `stats.ozwebsites.biz` | <span style='color:red;'>**15**</span> | TLD Rejected: **.biz is marked as abusive.** |
-| `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
 | `adop.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `deathtrapet.info` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `gevertixon.net` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `wowclick.in` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `oceautoelevadores.com.ar` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `lokatapipelinepro.net` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `siq.gr1tmodule.ru` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `chexirbeld.net` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `austral-nifex-app.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `egcef.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `manoarrov.pro` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
 
 *The complete list of 234,629 excluded domains is available in `excluded_domains_report.csv` for deeper analysis.*
 
