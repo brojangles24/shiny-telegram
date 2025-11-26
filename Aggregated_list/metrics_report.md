@@ -1,5 +1,5 @@
 # 🛡️ Singularity DNS Blocklist Dashboard
-*Generated: 2025-11-26 04:29:45*
+*Generated: 2025-11-26 04:34:38*
 
 ## 📜 Aggregation Summary
 | Metric | Count | Insight |
@@ -16,16 +16,16 @@
 These are the highest-scoring domains that failed to make the final list:
 | Domain | Weighted Score | Exclusion Reason |
 | :--- | :---: | :--- |
-| `ad.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
 | `stats.ozwebsites.biz` | <span style='color:red;'>**15**</span> | TLD Rejected: **.biz is marked as abusive.** |
-| `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
 | `zlp6s.pw` | <span style='color:red;'>**15**</span> | TLD Rejected: **.pw is marked as abusive.** |
+| `adserve.work` | <span style='color:red;'>**15**</span> | TLD Rejected: **.work is marked as abusive.** |
+| `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
 | `crosspromotion.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `jamkoi.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `sandfordbitline.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `ricwqgjrivds.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `ethereum-eprex-pro-v3.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `pk-entertainment.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `file-7.ru` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `celinehandbagsonsale.net` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `jenniferaustin.typeform.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `winddns.hopto.org` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `nsc-ru.weebly.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
 
 *The complete list of 234,610 excluded domains is available in `excluded_domains_report.csv` for deeper analysis.*
 
@@ -48,24 +48,20 @@ These are the highest-scoring domains that failed to make the final list:
 ---
 
 ## 🔄 Priority List Change & Novelty Index
-| Change Type | Domain Count | Novelty Breakdown |
-| :--- | :---: | :--- |
-| **Domains Added** | 16,963 | **0 Fresh** ✨ / **16,963 Promoted** ⬆️ |
-| **Domains Removed** | 16,963 | |
-| **Domains Remained** | 283,037 | |
+> *Change tracking metrics are unavailable in this version as the cache file has been removed.*
 
 ## 🌐 Source Performance & Health Check
 | Source | Category | Weight | Total Fetched | In Priority List | Volatility ($\pm \%$) | Color |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **HAGEZI_ULTIMATE** | Aggregated/Wildcard | 4 | 232,363 | 186,085 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#d62728;'>███</span> |
-| **1HOSTS_LITE** | Aggregated/Wildcard | 3 | 92,483 | 79,145 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#2ca02c;'>███</span> |
-| **ADGUARD_BASE** | ABP Rule List | 3 | 119,141 | 98,631 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#17becf;'>███</span> |
-| **OISD_BIG** | Aggregated/Wildcard | 2 | 215,379 | 99,179 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#1f77b4;'>███</span> |
-| **ANUDEEP_ADSERVERS** | Specialized (Ads) | 2 | 42,347 | 7,045 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#9467bd;'>███</span> |
-| **ADAWAY_HOSTS** | Specialized (Ads) | 2 | 6,540 | 6,488 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#8c564b;'>███</span> |
-| **STEVENBLACK_HOSTS** | Hosts File (Legacy) | 1 | 97,120 | 37,732 | <span style='color:green;'>`+0.0%`</span> | <span style='color:#ff7f0e;'>███</span> |
+| **HAGEZI_ULTIMATE** | Aggregated/Wildcard | 4 | 232,363 | 186,085 | <span style=''>`N/A`</span> | <span style='color:#d62728;'>███</span> |
+| **1HOSTS_LITE** | Aggregated/Wildcard | 3 | 92,483 | 79,145 | <span style=''>`N/A`</span> | <span style='color:#2ca02c;'>███</span> |
+| **ADGUARD_BASE** | ABP Rule List | 3 | 119,141 | 98,631 | <span style=''>`N/A`</span> | <span style='color:#17becf;'>███</span> |
+| **OISD_BIG** | Aggregated/Wildcard | 2 | 215,379 | 99,179 | <span style=''>`N/A`</span> | <span style='color:#1f77b4;'>███</span> |
+| **ANUDEEP_ADSERVERS** | Specialized (Ads) | 2 | 42,347 | 7,045 | <span style=''>`N/A`</span> | <span style='color:#9467bd;'>███</span> |
+| **ADAWAY_HOSTS** | Specialized (Ads) | 2 | 6,540 | 6,488 | <span style=''>`N/A`</span> | <span style='color:#8c564b;'>███</span> |
+| **STEVENBLACK_HOSTS** | Hosts File (Legacy) | 1 | 97,120 | 37,732 | <span style=''>`N/A`</span> | <span style='color:#ff7f0e;'>███</span> |
 
 ---
 
 ## 📈 Interactive Visualization
-The **Score-filterable Domain List** is available at: [`dashboard.html`](dashboard.html)
+*Note: The interactive dashboard (`dashboard.html`) feature was disabled to prevent file size issues.*
