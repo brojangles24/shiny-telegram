@@ -57,7 +57,7 @@ CACHE_FILE = OUTPUT_DIR / "fetch_cache.json"
 
 # Scoring and style
 PRIORITY_CAP = 300_000
-CONSENSUS_THRESHOLD = 6 # Threshold for "High Consensus" domains
+CONSENSUS_THRESHOLD = 9 # Threshold for "High Consensus" domains
 
 # CUSTOM WEIGHTS: (Max Score is now 17)
 SOURCE_WEIGHTS: Dict[str, int] = {
