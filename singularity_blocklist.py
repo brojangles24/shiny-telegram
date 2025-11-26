@@ -24,14 +24,7 @@ import plotly.io as pio
 
 # --- Configuration & Constants ---
 
-# Regular expressions for validation
-DOMAIN_REGEX = re.compile(
-    r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
-)
-# Simple pattern to catch common IPv4 addresses (e.g., 1.2.3.4)
-IPV4_REGEX = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
-
-# Define the sources for blocklists (6 sources remaining)
+# --- Updated Blocklist Sources ---
 BLOCKLIST_SOURCES: Dict[str, str] = {
     "HAGEZI_ULTIMATE": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/ultimate-onlydomains.txt",
     "OISD_BIG": "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_big.txt",
@@ -39,44 +32,68 @@ BLOCKLIST_SOURCES: Dict[str, str] = {
     "STEVENBLACK_HOSTS": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
     "ANUDEEP_ADSERVERS": "https://raw.githubusercontent.com/anudeepND/blacklist/master/adservers.txt",
     "ADAWAY_HOSTS": "https://adaway.org/hosts.txt",
+    "ADGUARD_FILTER": "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt"
 }
-HAGEZI_ABUSED_TLDS: str = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/spam-tlds-onlydomains.txt"
 
-# Output configuration
-OUTPUT_DIR = Path("Aggregated_list")
-PRIORITY_FILENAME = "priority_300k.txt"
-REGEX_TLD_FILENAME = "regex_hagezi_tlds.txt"
-UNFILTERED_FILENAME = "aggregated_full.txt"
-HISTORY_FILENAME = "history.csv"
-REPORT_FILENAME = "metrics_report.md"
-HEATMAP_IMAGE = "overlap_heatmap_sources.png"
-DASHBOARD_HTML = "dashboard.html"
-CACHE_FILE = OUTPUT_DIR / "fetch_cache.json"
-
-# Scoring and style
-PRIORITY_CAP = 300_000
-CONSENSUS_THRESHOLD = 6 # Threshold for "High Consensus" domains
-
-# CUSTOM WEIGHTS: (Max Score is 14)
 SOURCE_WEIGHTS: Dict[str, int] = {
     "HAGEZI_ULTIMATE": 4,
     "1HOSTS_LITE": 3,
-    "OISD_BIG": 2, 
+    "OISD_BIG": 2,
     "ANUDEEP_ADSERVERS": 2,
     "ADAWAY_HOSTS": 2,
-    "STEVENBLACK_HOSTS": 1
+    "STEVENBLACK_HOSTS": 1,
+    "ADGUARD_FILTER": 2
 }
-MAX_SCORE = sum(SOURCE_WEIGHTS.values()) # 14
+MAX_SCORE = sum(SOURCE_WEIGHTS.values())
 
-# Color-coded sources for better reporting/visualization
-SOURCE_COLORS = {
-    "HAGEZI_ULTIMATE": "#d62728", 
-    "OISD_BIG": "#1f77b4",       
-    "1HOSTS_LITE": "#2ca02c",    
-    "STEVENBLACK_HOSTS": "#ff7f0e",
-    "ANUDEEP_ADSERVERS": "#9467bd",
-    "ADAWAY_HOSTS": "#8c564b",
-}
+SOURCE_COLORS.update({
+    "ADGUARD_FILTER": "#17becf"
+})
+
+# --- Updated process_domain function ---
+def process_domain(line: str) -> Optional[str]:
+    """Cleans a line from a blocklist file, handles filter syntax, ignores IPs and ! comments."""
+    if not line:
+        return None
+    line = line.strip().lower()
+
+    # Skip comments, whitelists, and AdGuard (!) rules
+    if line.startswith(("#", "!", "|", "@@")):
+        return None
+
+    # Hosts file style: 0.0.0.0 domain
+    parts = line.split()
+    if len(parts) >= 2 and parts[0] in ("0.0.0.0", "127.0.0.1"):
+        domain = parts[1]
+    elif len(parts) >= 1 and not line.startswith('/'):
+        domain = parts[0]
+    else:
+        domain = line
+
+    if not domain:
+        return None
+
+    # Strip common ABP/AdGuard markers
+    domain = domain.lstrip("*").lstrip(".")
+    for char in ['||', '^', '$', '/', '#', '@', '&', '%', '?', '~']:
+        domain = domain.replace(char, ' ').strip()
+    domain = domain.split()[0] if domain else None
+
+    if not domain:
+        return None
+
+    # Reject reserved names and IPs
+    if domain in ("localhost", "localhost.localdomain", "::1", "255.255.255.255", "wpad"):
+        return None
+    if IPV4_REGEX.match(domain):
+        return None
+
+    # Strict regex validation
+    if not DOMAIN_REGEX.match(domain):
+        return None
+
+    return domain
+    
 ASCII_SPARKLINE_CHARS = " ▂▃▄▅▆▇█"
 
 # --- Logging Setup ---
