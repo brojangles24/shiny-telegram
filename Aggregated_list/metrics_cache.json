@@ -1,8 +1,8 @@
 {
-  "1HOSTS_LITE": {
-    "In_Priority_List": 79126,
-    "Unique_to_Source": 19809,
-    "Total_Fetched": 92543,
+  "HAGEZI_ULTIMATE": {
+    "In_Priority_List": 186270,
+    "Unique_to_Source": 103532,
+    "Total_Fetched": 232644,
     "Volatility": "+0.0%"
   },
   "ADAWAY_HOSTS": {
@@ -17,11 +17,11 @@
     "Total_Fetched": 97120,
     "Volatility": "+0.0%"
   },
-  "OISD_BIG": {
-    "In_Priority_List": 99157,
-    "Unique_to_Source": 110273,
-    "Total_Fetched": 215376,
-    "Volatility": "+0.1%"
+  "ADGUARD_BASE": {
+    "In_Priority_List": 98700,
+    "Unique_to_Source": 47284,
+    "Total_Fetched": 119323,
+    "Volatility": "+0.0%"
   },
   "ANUDEEP_ADSERVERS": {
     "In_Priority_List": 7045,
@@ -29,16 +29,16 @@
     "Total_Fetched": 42347,
     "Volatility": "+0.0%"
   },
-  "HAGEZI_ULTIMATE": {
-    "In_Priority_List": 186270,
-    "Unique_to_Source": 103532,
-    "Total_Fetched": 232644,
+  "1HOSTS_LITE": {
+    "In_Priority_List": 79126,
+    "Unique_to_Source": 19809,
+    "Total_Fetched": 92543,
     "Volatility": "+0.0%"
   },
-  "ADGUARD_BASE": {
-    "In_Priority_List": 98690,
-    "Unique_to_Source": 47284,
-    "Total_Fetched": 119300,
+  "OISD_BIG": {
+    "In_Priority_List": 99157,
+    "Unique_to_Source": 110251,
+    "Total_Fetched": 215376,
     "Volatility": "+0.0%"
   }
 }
