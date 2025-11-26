@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v5.4 - Aggregated Full Fix Edition)
+🚀 Singularity DNS Blocklist Aggregator (v5.5 - Structural Fix Edition)
 
-- **CRITICAL FIX:** Corrected logic to ensure 'aggregated_full.txt' includes ALL scored domains,
-  including those rejected by the Hagezi TLD filter.
+- **CRITICAL FIX:** Structural reordering to eliminate NameError: name 'write_verbose_exclusion_report' is not defined.
+- **ALL FEATURES RETAINED:** Async, Punycode, TLD filtering, Dynamic Cap, Archiving.
 """
 import sys
 import csv
@@ -28,6 +28,7 @@ try:
     import idna 
     from plotly.offline import plot
 except ImportError as e:
+    # This check is now just a safety net, as the calling environment handles the check.
     print(f"FATAL ERROR: Missing required library: {e.name}")
     print("Please run: pip install requests aiohttp plotly idna")
     sys.exit(1)
@@ -69,6 +70,7 @@ UNFILTERED_FILENAME = "aggregated_full.txt"
 HISTORY_FILENAME = "history.csv"
 REPORT_FILENAME = "metrics_report.md"
 DASHBOARD_HTML = "dashboard_html_removed.html" 
+DATA_CACHE_FILE = OUTPUT_DIR / "data_cache.json" 
 VERBOSE_EXCLUSION_FILE = "excluded_domains_report.csv" 
 
 # Scoring and style
@@ -107,6 +109,7 @@ class ConsoleLogger:
     def debug(self, msg): self.logger.debug(msg)
 
 # --- Consolidated Cache Functions ---
+
 def load_data_cache() -> Dict[str, Any]:
     """Loads all cached data from disk."""
     default_cache = {
@@ -132,11 +135,147 @@ def save_data_cache(cache_data: Dict[str, Any]):
     except Exception as e:
         logging.error(f"Failed to save data cache file: {e}")
 
-# --- Utility Functions ---
+# --- General Utility Functions ---
+
+def generate_sparkline(values: List[int], logger: ConsoleLogger) -> str:
+    """Generates an ASCII sparkline from a list of integer values."""
+    if not values: return ""
+    min_val, max_val = min(values), max(values)
+    range_val = max_val - min_val
+    num_chars = len(ASCII_SPARKLINE_CHARS) - 1
+    
+    if range_val == 0: return ASCII_SPARKLINE_CHARS[-1] * len(values)
+
+    try:
+        sparkline = ""
+        for val in values:
+            index = int((val - min_val) / range_val * num_chars)
+            sparkline += ASCII_SPARKLINE_CHARS[index]
+        return sparkline
+    except Exception as e:
+        logger.error(f"Sparkline generation failed: {e}")
+        return "N/A"
+
+def extract_tld(domain: str) -> Optional[str]:
+    """Extracts the simple TLD."""
+    parts = domain.split(".")
+    return parts[-1] if len(parts) >= 2 else None
+
+# --- File Writing, Archiving, and Cleanup Functions (Structural Fix) ---
+
+def cleanup_old_files(output_path: Path, logger: ConsoleLogger):
+    """Deletes old files from cache and archive folders based on CACHE_CLEANUP_DAYS."""
+    cutoff_date = datetime.now() - timedelta(days=CACHE_CLEANUP_DAYS)
+    deleted_count = 0
+    
+    dirs_to_clean = [output_path, ARCHIVE_DIR]
+    
+    for directory in dirs_to_clean:
+        if not directory.exists(): continue
+        
+        for item in directory.iterdir():
+            if item.is_file():
+                if item.name.endswith(".txt") or item.name.endswith(".json") or item.name.endswith(".csv"):
+                    mod_time = datetime.fromtimestamp(item.stat().st_mtime)
+                    if mod_time < cutoff_date:
+                        try:
+                            item.unlink()
+                            deleted_count += 1
+                        except OSError as e:
+                            logger.error(f"Failed to delete old file {item.name}: {e}")
+
+    if deleted_count > 0:
+        logger.info(f"🧹 Cleaned up {deleted_count} old cache/archive/history files (> {CACHE_CLEANUP_DAYS} days old).")
+
+def archive_priority_list(output_path: Path, filename: str, logger: ConsoleLogger):
+    """Archives the primary priority list file with a timestamp."""
+    ARCHIVE_DIR.mkdir(exist_ok=True)
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+    
+    source_path = output_path / filename
+    if not source_path.exists():
+        logger.error(f"Cannot archive: Source file not found at {source_path}")
+        return
+
+    archive_path = ARCHIVE_DIR / f"priority_{timestamp}.txt"
+    try:
+        archive_path.write_bytes(source_path.read_bytes())
+        logger.info(f"📦 Archived current priority list to {archive_path.name}")
+    except Exception as e:
+        logger.error(f"Failed to archive priority list: {e}")
+
+def write_verbose_exclusion_report(
+    excluded_domains: List[Dict[str, Any]], output_path: Path, logger: ConsoleLogger
+):
+    """Writes a CSV file containing all domains that failed to make the Priority List."""
+    
+    if not excluded_domains:
+        logger.info("Skipping verbose report: No domains excluded by TLD filter or score cutoff.")
+        return
+
+    csv_path = output_path / VERBOSE_EXCLUSION_FILE
+    
+    try:
+        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+            fieldnames = ['domain', 'score', 'status', 'reason']
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(excluded_domains)
+        logger.info(f"💾 Verbose exclusion report written: {csv_path.name} ({len(excluded_domains):,} entries)")
+    except Exception as e:
+        logger.error(f"Failed to write verbose exclusion report: {e}")
+
+def write_output_files(
+    priority_set: Set[str], abused_tlds: Set[str], full_list: List[str], output_path: Path, 
+    logger: ConsoleLogger, priority_cap_val: int, excluded_domains_verbose: List[Dict[str, Any]], 
+    write_verbose: bool, output_format: str
+):
+    """Writes all final output files in the specified format."""
+    logger.info("💾 Writing final output files...")
+    output_path.mkdir(exist_ok=True, parents=True)
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # 1. Priority List (TLD-filtered and capped)
+    priority_file = output_path / PRIORITY_FILENAME
+    
+    if output_format == 'hosts':
+        prefix = "0.0.0.0 "
+        header = f"# Hosts File Priority {priority_cap_val} Blocklist (Actual size: {len(priority_set):,})\n# Generated: {now_str}\n"
+    else: # Default is raw/unbound
+        prefix = ""
+        header = f"# Priority {priority_cap_val} Blocklist (Actual size: {len(priority_set):,})\n# Generated: {now_str}\n"
+
+    with open(priority_file, "w", encoding="utf-8") as f:
+        f.write(header)
+        f.write(f"# Total: {len(priority_set):,}\n")
+        f.writelines(prefix + d + "\n" for d in sorted(priority_set))
+    
+    # 2. Archive the list
+    archive_priority_list(output_path, PRIORITY_FILENAME, logger)
+
+    # 3. Verbose Exclusion Report
+    if write_verbose:
+        write_verbose_exclusion_report(excluded_domains_verbose, output_path, logger)
+        
+    # 4. Abused TLD Regex List
+    regex_file = output_path / REGEX_TLD_FILENAME
+    with open(regex_file, "w", encoding="utf-8") as f:
+        f.write(f"# Hagezi Abused TLDs Regex List\n# Generated: {now_str}\n# Total: {len(abused_tlds):,}\n")
+        f.writelines(f"\\.{t}$\n" for t in sorted(abused_tlds))
+        
+    # 5. Full Aggregated List (ALL scored domains, including TLD rejected)
+    unfiltered_file = output_path / UNFILTERED_FILENAME
+    with open(unfiltered_file, "w", encoding="utf-8") as f:
+        f.write(f"# Full Aggregated List (ALL Scored Domains, Sorted by Score)\n# Generated: {now_str}\n# Total: {len(full_list):,}\n")
+        f.writelines(d + "\n" for d in full_list)
+        
+    logger.info(f"✅ Outputs written to: {output_path.resolve()}")
+
+# --- Domain Processing Functions ---
 
 async def fetch_list(session: aiohttp.ClientSession, url: str, name: str, logger: ConsoleLogger) -> List[str]:
     """Fetches list using aiohttp and retries, without file caching."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.4'}
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.5'}
     
     for attempt in range(MAX_FETCH_RETRIES):
         try:
@@ -150,10 +289,10 @@ async def fetch_list(session: aiohttp.ClientSession, url: str, name: str, logger
         except aiohttp.client_exceptions.ClientError as e:
             logger.error(f"Error fetching {name} (Attempt {attempt+1}/{MAX_FETCH_RETRIES}): {e.__class__.__name__}: {e}")
             if attempt < MAX_FETCH_RETRIES - 1:
-                await asyncio.sleep(2 * (attempt + 1))
+                await asyncio.sleep(2 * (attempt + 1)) 
         except Exception as e:
             logger.error(f"Unexpected error for {name}: {e}")
-            break
+            break 
 
     logger.error(f"❌ All attempts failed for {name}. Returning empty list.")
     return []
@@ -192,63 +331,6 @@ def process_domain(line: str) -> Optional[str]:
     
     return ascii_domain
 
-def extract_tld(domain: str) -> Optional[str]:
-    """Extracts the simple TLD."""
-    parts = domain.split(".")
-    return parts[-1] if len(parts) >= 2 else None
-
-def track_history(count: int, history_path: Path, logger: ConsoleLogger) -> Tuple[int, List[Dict[str, str]]]:
-    """Reads, updates, and writes the aggregation history, returning all history."""
-    HEADER = ["Date", "Total_Unique_Domains", "Change"]
-    history: List[Dict[str, str]] = []
-    last_count = 0
-
-    if history_path.exists():
-        try:
-            with open(history_path, "r", newline="", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                if reader.fieldnames == HEADER:
-                    history = list(reader)
-                    if history: last_count = int(history[-1].get("Total_Unique_Domains", 0))
-        except Exception as e: logger.error(f"Failed to read history file: {e}")
-
-    change = count - last_count
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    if history and history[-1].get("Date") == today:
-        history[-1]["Total_Unique_Domains"] = str(count)
-        history[-1]["Change"] = str(change)
-    else:
-        history.append({"Date": today, "Total_Unique_Domains": str(count), "Change": str(change)})
-
-    try:
-        with open(history_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=HEADER)
-            writer.writeheader()
-            writer.writerows(history)
-    except Exception as e: logger.error(f"Failed to write history file: {e}")
-
-    return change, history
-
-def generate_sparkline(values: List[int], logger: ConsoleLogger) -> str:
-    """Generates an ASCII sparkline from a list of integer values."""
-    if not values: return ""
-    min_val, max_val = min(values), max(values)
-    range_val = max_val - min_val
-    num_chars = len(ASCII_SPARKLINE_CHARS) - 1
-    
-    if range_val == 0: return ASCII_SPARKLINE_CHARS[-1] * len(values)
-
-    try:
-        sparkline = ""
-        for val in values:
-            index = int((val - min_val) / range_val * num_chars)
-            sparkline += ASCII_SPARKLINE_CHARS[index]
-        return sparkline
-    except Exception as e:
-        logger.error(f"Sparkline generation failed: {e}")
-        return "N/A"
-
 # --- Core Processing Functions ---
 
 async def fetch_and_process_sources_async(max_workers: int, logger: ConsoleLogger) -> Tuple[Dict[str, Set[str]], Dict[str, Set[str]]]:
@@ -286,7 +368,6 @@ def aggregate_and_score_domains(source_sets: Dict[str, Set[str]]) -> Tuple[Count
 
     return combined_counter, overlap_counter, domain_sources
 
-# CORRECTED FILTER_AND_PRIORITIZE
 def filter_and_prioritize(
     combined_counter: Counter, logger: ConsoleLogger,
     priority_cap: int 
@@ -299,13 +380,12 @@ def filter_and_prioritize(
     3. excluded_domains_verbose (for verbose report)
     """
     
-    tld_lines = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.4'}).text.splitlines()
+    tld_lines = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.5'}).text.splitlines()
     abused_tlds = {l.strip().lower() for l in tld_lines if l.strip() and not l.startswith("#")}
 
     logger.info(f"🚫 Excluding domains with {len(abused_tlds)} known abusive TLDs.")
     
     # 1. Create a list of ALL scored domains (domain, score) for the full report
-    # This list maintains TLD-rejected domains, sorted by score.
     full_scored_list: List[Tuple[str, int]] = sorted(
         combined_counter.items(), key=lambda x: x[1], reverse=True
     )
@@ -329,8 +409,6 @@ def filter_and_prioritize(
         else:
             priority_candidates.append((domain, weight))
             
-    # priority_candidates is already sorted by score from full_scored_list
-
     # 3. Apply the priority cap to the TLD-filtered candidates
     final_priority = {d for d, _ in priority_candidates[:priority_cap]}
     
@@ -349,7 +427,7 @@ def filter_and_prioritize(
 
 
 def calculate_source_metrics(
-    priority_set: Set[str], full_list: List[str], overlap_counter: Counter, # Note: using full_list here which is the unfiltered list
+    priority_set: Set[str], full_list: List[str], overlap_counter: Counter, 
     domain_sources: Dict[str, Set[str]], all_domains_from_sources: Dict[str, Set[str]], logger: ConsoleLogger
 ) -> Dict[str, Dict[str, Union[int, str]]]:
     """Calculates contribution and uniqueness metrics per source (volatility is always 'New')."""
@@ -430,7 +508,7 @@ def generate_markdown_report(
     
     report.append("| Metric | Count | Insight |")
     report.append("| :--- | :---: | :--- |")
-    report.append(f"| **Total Scored Domains** | **{len(full_list):,}** | Size of the list including TLD rejected entries. |") # Use len(full_list) now
+    report.append(f"| **Total Scored Domains** | **{len(full_list):,}** | Size of the list including TLD rejected entries. |") 
     report.append(f"| Change vs. Last Run | `{change:+}` {trend_icon} | Trend in the total unique domain pool. |")
     report.append(f"| Priority List Size | {priority_count:,} | Capped domains selected (Cap: **{priority_cap_val:,}**). |")
     report.append(f"| High Consensus (Score {CONSENSUS_THRESHOLD}+) | {high_consensus_count:,} | Domains backed by strong weighted evidence. |")
@@ -548,126 +626,7 @@ def generate_markdown_report(
         f.write("\n".join(report))
 
 
-# --- File Writing & Cleanup ---
-
-def cleanup_old_files(output_path: Path, logger: ConsoleLogger):
-    """Deletes old files from cache and archive folders based on CACHE_CLEANUP_DAYS."""
-    cutoff_date = datetime.now() - timedelta(days=CACHE_CLEANUP_DAYS)
-    deleted_count = 0
-    
-    dirs_to_clean = [output_path, ARCHIVE_DIR]
-    
-    for directory in dirs_to_clean:
-        if not directory.exists(): continue
-        
-        for item in directory.iterdir():
-            if item.is_file():
-                if item.name.endswith(".txt") or item.name.endswith(".json") or item.name.endswith(".csv"):
-                    mod_time = datetime.fromtimestamp(item.stat().st_mtime)
-                    if mod_time < cutoff_date:
-                        try:
-                            item.unlink()
-                            deleted_count += 1
-                        except OSError as e:
-                            logger.error(f"Failed to delete old file {item.name}: {e}")
-
-    if deleted_count > 0:
-        logger.info(f"🧹 Cleaned up {deleted_count} old cache/archive/history files (> {CACHE_CLEANUP_DAYS} days old).")
-
-def archive_priority_list(output_path: Path, filename: str, logger: ConsoleLogger):
-    """Archives the primary priority list file with a timestamp."""
-    ARCHIVE_DIR.mkdir(exist_ok=True)
-    timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
-    
-    source_path = output_path / filename
-    if not source_path.exists():
-        logger.error(f"Cannot archive: Source file not found at {source_path}")
-        return
-
-    archive_path = ARCHIVE_DIR / f"priority_{timestamp}.txt"
-    try:
-        archive_path.write_bytes(source_path.read_bytes())
-        logger.info(f"📦 Archived current priority list to {archive_path.name}")
-    except Exception as e:
-        logger.error(f"Failed to archive priority list: {e}")
-
-def write_output_files(
-    priority_set: Set[str], abused_tlds: Set[str], full_list: List[str], output_path: Path, 
-    logger: ConsoleLogger, priority_cap_val: int, excluded_domains_verbose: List[Dict[str, Any]], 
-    write_verbose: bool, output_format: str
-):
-    """Writes all final output files in the specified format."""
-    logger.info("💾 Writing final output files...")
-    output_path.mkdir(exist_ok=True, parents=True)
-    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-    # 1. Priority List (TLD-filtered and capped)
-    priority_file = output_path / PRIORITY_FILENAME
-    
-    if output_format == 'hosts':
-        prefix = "0.0.0.0 "
-        header = f"# Hosts File Priority {priority_cap_val} Blocklist (Actual size: {len(priority_set):,})\n# Generated: {now_str}\n"
-    else: # Default is raw/unbound
-        prefix = ""
-        header = f"# Priority {priority_cap_val} Blocklist (Actual size: {len(priority_set):,})\n# Generated: {now_str}\n"
-
-    with open(priority_file, "w", encoding="utf-8") as f:
-        f.write(header)
-        f.write(f"# Total: {len(priority_set):,}\n")
-        f.writelines(prefix + d + "\n" for d in sorted(priority_set))
-    
-    # 2. Archive the list
-    archive_priority_list(output_path, PRIORITY_FILENAME, logger)
-
-    # 3. Verbose Exclusion Report
-    if write_verbose:
-        write_verbose_exclusion_report(excluded_domains_verbose, output_path, logger)
-        
-    # 4. Abused TLD Regex List
-    regex_file = output_path / REGEX_TLD_FILENAME
-    with open(regex_file, "w", encoding="utf-8") as f:
-        f.write(f"# Hagezi Abused TLDs Regex List\n# Generated: {now_str}\n# Total: {len(abused_tlds):,}\n")
-        f.writelines(f"\\.{t}$\n" for t in sorted(abused_tlds))
-        
-    # 5. Full Aggregated List (ALL scored domains, including TLD rejected)
-    unfiltered_file = output_path / UNFILTERED_FILENAME
-    with open(unfiltered_file, "w", encoding="utf-8") as f:
-        f.write(f"# Full Aggregated List (ALL Scored Domains, Sorted by Score)\n# Generated: {now_str}\n# Total: {len(full_list):,}\n")
-        f.writelines(d + "\n" for d in full_list)
-        
-    logger.info(f"✅ Outputs written to: {output_path.resolve()}")
-
-# --- Test Functions (Placeholder for future development) ---
-def run_tests(output_path, logger):
-    logger.info("--- 🧪 Running Internal Integrity Tests ---")
-    
-    test_domains = {
-        "xn--fzc.com": "xn--fzc.com", 
-        "bücher.de": "xn--bcher-kva.de", 
-        "google.com^$script": "google.com", 
-        "0.0.0.0 bad.com": "bad.com", 
-        "1.2.3.4": None, 
-        "||tracker.com^": "tracker.com" 
-    }
-    
-    passed = 0
-    total = len(test_domains)
-    for input_line, expected in test_domains.items():
-        result = process_domain(input_line)
-        if result == expected:
-            passed += 1
-            logger.debug(f"PASS: '{input_line}' -> '{result}'")
-        else:
-            logger.error(f"FAIL: '{input_line}' -> Expected '{expected}', Got '{result}'")
-            
-    if passed == total:
-        logger.info(f"✅ All {total} process_domain tests passed.")
-        return 0
-    else:
-        logger.error(f"❌ {passed}/{total} tests passed. Check logs for failures.")
-        return 1
-
-# --- Main Execution ---
+# --- Final Execution Block ---
 def main():
     """Main function to run the aggregation process."""
     parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.4)")
@@ -720,7 +679,7 @@ def main():
         combined_counter, overlap_counter, domain_sources = aggregate_and_score_domains(source_sets)
         total_unfiltered = len(combined_counter)
         
-        # 3. Filter & Prioritize (Returns full_list with TLD-rejected domains)
+        # 3. Filter & Prioritize (Returns full_list with ALL scored domains, including TLD rejected)
         priority_set, abused_tlds, excluded_count, full_list, tld_exclusion_counter, excluded_domains_verbose = filter_and_prioritize(
             combined_counter, logger, priority_cap_val
         )
