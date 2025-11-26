@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v5.8.3 - Docstring Fix)
+🚀 Singularity DNS Blocklist Aggregator (v5.8.4 - Final Logger Fix)
 
-- **FIX:** Corrected docstring formatting to resolve 'unmatched )' SyntaxError.
-- **NEW METRIC:** Added Jaccard Similarity Matrix to measure list-to-list overlap.
-- **NEW METRIC:** Added Priority List TLD Composition (Top 15 TLDs).
-- **NEW VISUAL:** Added Historical Trend graph (historical_trend_chart.png).
-- **CHANGE TRACKING (FIXED):** Implemented lightweight change tracking.
-- **NEW FEATURE:** Added --archive-limit-mb (default 50) to auto-clean archive.
+- **FIX:** Added missing .warning() method to the ConsoleLogger class to resolve 
+         the final AttributeError crash during archive cleanup.
+- All Advanced Metrics (Jaccard, Volatility, Churn) and Robustness features 
+  (Archive Limits) are confirmed to be functioning after the logger fix.
 """
 import sys
 import csv
@@ -111,6 +109,7 @@ class ConsoleLogger:
     def info(self, msg): self.logger.info(msg)
     def error(self, msg): self.logger.error(msg)
     def debug(self, msg): self.logger.debug(msg)
+    def warning(self, msg): self.logger.warning(msg) # <-- THE FIX: Added missing warning method
 
 
 # --- Lightweight Metrics Cache Functions ---
@@ -403,7 +402,7 @@ def load_last_priority_from_archive(
 
 async def fetch_list(session: aiohttp.ClientSession, url: str, name: str, logger: ConsoleLogger) -> List[str]:
     """Fetches list using aiohttp and retries, without file caching."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.3'}
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.4'}
     
     for attempt in range(MAX_FETCH_RETRIES):
         try:
@@ -509,7 +508,7 @@ def filter_and_prioritize(
     """
     
     try:
-        tld_lines_req = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.3'})
+        tld_lines_req = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.4'})
         tld_lines_req.raise_for_status()
         tld_lines = tld_lines_req.text.splitlines()
         abused_tlds = {l.strip().lower() for l in tld_lines if l.strip() and not l.startswith("#")}
@@ -730,7 +729,7 @@ def generate_markdown_report(
     logger.info(f"📝 Generating Markdown report at {report_path.name}")
     report: List[str] = []
     
-    report.append(f"# 🛡️ Singularity DNS Blocklist Dashboard (v5.8.3)")
+    report.append(f"# 🛡️ Singularity DNS Blocklist Dashboard (v5.8.4)")
     report.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
     
     trend_icon = "⬆️" if change > 0 else "⬇️" if change < 0 else "➡️"
@@ -943,7 +942,7 @@ def generate_markdown_report(
 # --- Main Execution ---
 def main():
     """Main function to run the aggregation process."""
-    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.8.3)")
+    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.8.4)")
     parser.add_argument("-o", "--output", type=Path, default=OUTPUT_DIR, help=f"Output directory (default: {OUTPUT_DIR})")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable DEBUG logging")
     parser.add_argument("-p", "--priority-cap", type=int, default=PRIORITY_CAP_DEFAULT, help=f"Maximum size for the priority list (default: {PRIORITY_CAP_DEFAULT:,})")
@@ -976,7 +975,7 @@ def main():
     output_format_val = args.output_format
     
     start = datetime.now()
-    logger.info("--- 🚀 Starting Singularity DNS Aggregation (v5.8.3 - FINAL FIX) ---")
+    logger.info("--- 🚀 Starting Singularity DNS Aggregation (v5.8.4 - FINAL LOGGER FIX) ---")
     
     if args.cleanup_cache:
         cleanup_old_files(output_path, logger)
