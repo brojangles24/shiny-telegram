@@ -1,5 +1,5 @@
 # 🛡️ Singularity DNS Blocklist Dashboard
-*Generated: 2025-11-26 04:19:57*
+*Generated: 2025-11-26 04:29:45*
 
 ## 📜 Aggregation Summary
 | Metric | Count | Insight |
@@ -12,20 +12,20 @@
 
 ---
 
-## ⚠️ Top Excluded Domains for Audit (High Score / TLD Rejection)
+## 🗑️ Top Excluded Domains for Audit (High Score / TLD Rejection)
 These are the highest-scoring domains that failed to make the final list:
 | Domain | Weighted Score | Exclusion Reason |
 | :--- | :---: | :--- |
-| `crosspromotion.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `stats.ozwebsites.biz` | <span style='color:red;'>**15**</span> | TLD Rejected: **.biz is marked as abusive.** |
-| `adserve.work` | <span style='color:red;'>**15**</span> | TLD Rejected: **.work is marked as abusive.** |
 | `ad.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `adop.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `stats.ozwebsites.biz` | <span style='color:red;'>**15**</span> | TLD Rejected: **.biz is marked as abusive.** |
 | `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
 | `zlp6s.pw` | <span style='color:red;'>**15**</span> | TLD Rejected: **.pw is marked as abusive.** |
-| `push-notifications.top` | <span style='color:red;'>**14**</span> | TLD Rejected: **.top is marked as abusive.** |
-| `special-offers.online` | <span style='color:red;'>**14**</span> | TLD Rejected: **.online is marked as abusive.** |
-| `dgafgadsgkjg.top` | <span style='color:red;'>**14**</span> | TLD Rejected: **.top is marked as abusive.** |
+| `crosspromotion.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `jamkoi.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `sandfordbitline.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `ricwqgjrivds.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `ethereum-eprex-pro-v3.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `pk-entertainment.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
 
 *The complete list of 234,610 excluded domains is available in `excluded_domains_report.csv` for deeper analysis.*
 
@@ -50,7 +50,9 @@ These are the highest-scoring domains that failed to make the final list:
 ## 🔄 Priority List Change & Novelty Index
 | Change Type | Domain Count | Novelty Breakdown |
 | :--- | :---: | :--- |
-| **Domains Added** | 16,987 | **0 Fresh** ✨ / **16,987 Promoted** ⬆️ |
+| **Domains Added** | 16,963 | **0 Fresh** ✨ / **16,963 Promoted** ⬆️ |
+| **Domains Removed** | 16,963 | |
+| **Domains Remained** | 283,037 | |
 
 ## 🌐 Source Performance & Health Check
 | Source | Category | Weight | Total Fetched | In Priority List | Volatility ($\pm \%$) | Color |
