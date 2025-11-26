@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v4.5 - IP Filtered Edition)
+🚀 Singularity DNS Blocklist Aggregator (v4.6 - Final Stable Edition)
 
+- 🔥 **ADGUARD_DNS REMOVED:** Script simplified for maximum stability by removing the complex ABP-formatted list.
 - ⚡ Implements HTTP Caching (ETag/Last-Modified) for efficient fetching.
-- 🔒 Robust domain processing IGNORES filter rules/comments and **EXPLICITLY FILTERS OUT IP ADDRESSES**.
-- ⚖️ Uses custom weighted scoring (4, 3, 2, 1) and tracks source overlap.
+- 🔒 Robust domain processing handles filter syntax and explicitly filters out IP addresses.
+- ⚖️ Uses custom weighted scoring (Max Score = 14) and tracks source overlap.
 - 📈 Generates rich Markdown reports with historical sparklines and detailed source metrics.
 """
 import sys
@@ -32,7 +33,7 @@ DOMAIN_REGEX = re.compile(
 # Simple pattern to catch common IPv4 addresses (e.g., 1.2.3.4)
 IPV4_REGEX = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
 
-# Define the sources for blocklists
+# Define the sources for blocklists (6 sources remaining)
 BLOCKLIST_SOURCES: Dict[str, str] = {
     "HAGEZI_ULTIMATE": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/ultimate-onlydomains.txt",
     "OISD_BIG": "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_big.txt",
@@ -40,8 +41,7 @@ BLOCKLIST_SOURCES: Dict[str, str] = {
     "STEVENBLACK_HOSTS": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
     "ANUDEEP_ADSERVERS": "https://raw.githubusercontent.com/anudeepND/blacklist/master/adservers.txt",
     "ADAWAY_HOSTS": "https://adaway.org/hosts.txt",
-    # Complex list is used as requested
-    "ADGUARD_DNS": "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt"
+    # ADGUARD_DNS removed for stability
 }
 HAGEZI_ABUSED_TLDS: str = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/spam-tlds-onlydomains.txt"
 
@@ -58,19 +58,18 @@ CACHE_FILE = OUTPUT_DIR / "fetch_cache.json"
 
 # Scoring and style
 PRIORITY_CAP = 300_000
-CONSENSUS_THRESHOLD = 8 # Threshold for "High Consensus" domains
+CONSENSUS_THRESHOLD = 8 # Threshold for "High Consensus" domains (still relevant)
 
-# CUSTOM WEIGHTS: Hagezi=4, 1Hosts=3, OISD=2, StevenBlack=1
+# CUSTOM WEIGHTS: (ADGUARD's weight of 3 is removed)
 SOURCE_WEIGHTS: Dict[str, int] = {
     "HAGEZI_ULTIMATE": 4,
     "1HOSTS_LITE": 3,
-    "ADGUARD_DNS": 3,
     "OISD_BIG": 2, 
     "ANUDEEP_ADSERVERS": 2,
     "ADAWAY_HOSTS": 2,
     "STEVENBLACK_HOSTS": 1
 }
-MAX_SCORE = sum(SOURCE_WEIGHTS.values())
+MAX_SCORE = sum(SOURCE_WEIGHTS.values()) # Now 4 + 3 + 2 + 2 + 2 + 1 = 14
 
 # Color-coded sources for better reporting/visualization
 SOURCE_COLORS = {
@@ -80,7 +79,7 @@ SOURCE_COLORS = {
     "STEVENBLACK_HOSTS": "#ff7f0e",
     "ANUDEEP_ADSERVERS": "#9467bd",
     "ADAWAY_HOSTS": "#8c564b",
-    "ADGUARD_DNS": "#e377c2"
+    # ADGUARD_DNS color removed
 }
 ASCII_SPARKLINE_CHARS = " ▂▃▄▅▆▇█"
 
@@ -128,7 +127,7 @@ def save_cache(cache_data: Dict[str, Any]):
 
 def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, Any], logger: ConsoleLogger) -> List[str]:
     """Fetches list with ETag/Last-Modified caching."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/4.5'}
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/4.6'}
     
     cached_headers = cache.get("headers", {}).get(name, {})
     if 'ETag' in cached_headers:
@@ -410,7 +409,7 @@ def generate_interactive_dashboard(
             x=[str(l) for l in overlap_levels],
             y=heatmap_data[src],
             name=src,
-            marker_color=SOURCE_COLORS[src],
+            marker_color=SOURCE_COLORS.get(src, "black"),
             hovertemplate="<b>Source:</b> %{name}<br><b>Overlap Level:</b> %{x}<br><b>Domains:</b> %{y:}<extra></extra>"
         ))
         
@@ -564,7 +563,7 @@ def write_output_files(
 
 def main():
     """Main function to run the aggregation process."""
-    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v4.5)")
+    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v4.6)")
     parser.add_argument(
         "-o", "--output", 
         type=Path, 
