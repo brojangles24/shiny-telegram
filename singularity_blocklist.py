@@ -46,9 +46,20 @@ SOURCE_WEIGHTS: Dict[str, int] = {
 }
 MAX_SCORE = sum(SOURCE_WEIGHTS.values())
 
-SOURCE_COLORS.update({
-    "ADGUARD_FILTER": "#17becf"
-})
+SOURCE_COLORS: Dict[str, str] = {
+    "HAGEZI_ULTIMATE": "#ff7f0e",
+    "1HOSTS_LITE": "#2ca02c",
+    "OISD_BIG": "#1f77b4",
+    "ANUDEEP_ADSERVERS": "#d62728",
+    "ADAWAY_HOSTS": "#9467bd",
+    "STEVENBLACK_HOSTS": "#8c564b",
+}
+
+IPV4_REGEX = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}$")
+DOMAIN_REGEX = re.compile(
+    r"^(?!-)[A-Za-z0-9-]{1,63}(?<!-)"
+    r"(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*$"
+)
 
 # --- Updated process_domain function ---
 def process_domain(line: str) -> Optional[str]:
