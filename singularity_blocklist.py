@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v5.3 - Ultimate Report Edition)
+🚀 Singularity DNS Blocklist Aggregator (v5.3 - Production Finalization Edition)
 
 - **FINALIZED:** All advanced features (Async, Verbose, Dynamic Cap, IDN, Archiving) integrated.
 - **IMPROVEMENT:** Enhanced Metric Readability and Insight in Markdown Report (Top Excluded Domains).
@@ -12,17 +12,26 @@ import argparse
 import json
 import re
 import asyncio
-from datetime import datetime, timedelta # Added timedelta for cleanup
+import os # Added for testing
+from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List, Dict, Set, Optional, Tuple, Any, Union
 
-import requests
-import aiohttp 
-import plotly.graph_objects as go
-import plotly.io as pio
-import idna 
+# --- Dependency Check and Imports ---
+try:
+    import requests
+    import aiohttp
+    import plotly.graph_objects as go
+    import plotly.io as pio
+    import idna 
+    from plotly.offline import plot
+except ImportError as e:
+    print(f"FATAL ERROR: Missing required library: {e.name}")
+    print("Please run: pip install requests aiohttp plotly idna")
+    sys.exit(1)
+# --- End Dependency Check ---
 
 # --- Configuration & Constants ---
 
@@ -53,7 +62,7 @@ SOURCE_CATEGORIES: Dict[str, str] = {
 
 # Output configuration
 OUTPUT_DIR = Path("Aggregated_list")
-ARCHIVE_DIR = OUTPUT_DIR / "archive" 
+ARCHIVE_DIR = OUTPUT_DIR / "archive"
 PRIORITY_FILENAME = "priority_300k.txt"
 REGEX_TLD_FILENAME = "regex_hagezi_tlds.txt"
 UNFILTERED_FILENAME = "aggregated_full.txt"
@@ -68,7 +77,7 @@ PRIORITY_CAP_DEFAULT = 300_000
 MAX_WORKERS_DEFAULT = 8
 CONSENSUS_THRESHOLD = 6 
 MAX_FETCH_RETRIES = 3 
-CACHE_CLEANUP_DAYS = 30 # For the new cleanup feature
+CACHE_CLEANUP_DAYS = 30 
 
 SOURCE_WEIGHTS: Dict[str, int] = {
     "HAGEZI_ULTIMATE": 4, "1HOSTS_LITE": 3, "OISD_BIG": 2, 
@@ -642,25 +651,27 @@ def generate_markdown_report(
     
     report.append("\n---")
     
-    # --- NEW: Top Excluded Domains Table (Readability Fix) ---
+    # --- Top Excluded Domains Table (Readability Fix) ---
     if excluded_domains_verbose:
-        report.append("\n## ⚠️ Top Excluded Domains for Audit (High Score / TLD Rejection)")
+        report.append("\n## 🗑️ Top Excluded Domains for Audit (High Score / TLD Rejection)")
 
         tld_excluded = [d for d in excluded_domains_verbose if d['status'] == 'TLD EXCLUDED']
         score_excluded = [d for d in excluded_domains_verbose if d['status'] == 'SCORE CUTOFF']
         
         samples_to_show = []
         
-        # Take up to 5 highest-scoring TLD-excluded domains
-        for d in tld_excluded:
+        # Collect top 5 TLD excluded domains
+        tld_excluded.sort(key=lambda x: x['score'], reverse=True)
+        for d in tld_excluded[:5]:
             samples_to_show.append({
                 'domain': d['domain'],
                 'score': d['score'],
                 'reason': f"TLD Rejected: **{d['reason'].split('TLD ')[1]}**"
             })
             
-        # Take up to 5 highest-scoring domains that missed the cutoff
-        for d in score_excluded:
+        # Collect top 5 score cutoff domains
+        score_excluded.sort(key=lambda x: x['score'], reverse=True)
+        for d in score_excluded[:5]:
              samples_to_show.append({
                 'domain': d['domain'],
                 'score': d['score'],
@@ -676,7 +687,6 @@ def generate_markdown_report(
             report.append("| :--- | :---: | :--- |")
             
             for item in samples_to_show[:10]:
-                # Apply color based on reason for immediate attention
                 reason_color = "red" if "TLD Rejected" in item['reason'] else "orange"
                 report.append(f"| `{item['domain']}` | <span style='color:{reason_color};'>**{item['score']}**</span> | {item['reason']} |")
         
@@ -702,6 +712,8 @@ def generate_markdown_report(
     report.append(f"| Change Type | Domain Count | Novelty Breakdown |")
     report.append("| :--- | :---: | :--- |")
     report.append(f"| **Domains Added** | {len(change_report['added']):,} | **{fresh_count:,} Fresh** ✨ / **{promoted_count:,} Promoted** ⬆️ |")
+    report.append(f"| **Domains Removed** | {len(change_report['removed']):,} | |")
+    report.append(f"| **Domains Remained** | {len(change_report['remained']):,} | |")
     
     # --- Source Performance Table (Category & Color-Coded Volatility) ---
     report.append("\n## 🌐 Source Performance & Health Check")
@@ -754,7 +766,6 @@ def cleanup_old_files(output_path: Path, logger: ConsoleLogger):
     cutoff_date = datetime.now() - timedelta(days=CACHE_CLEANUP_DAYS)
     deleted_count = 0
     
-    # Directories to clean
     dirs_to_clean = [output_path, ARCHIVE_DIR]
     
     for directory in dirs_to_clean:
@@ -762,7 +773,6 @@ def cleanup_old_files(output_path: Path, logger: ConsoleLogger):
         
         for item in directory.iterdir():
             if item.is_file():
-                # Get last modification time
                 if item.name.endswith(".json") or item.name.startswith("priority_"):
                     mod_time = datetime.fromtimestamp(item.stat().st_mtime)
                     if mod_time < cutoff_date:
@@ -838,113 +848,17 @@ def write_output_files(
         
     logger.info(f"✅ Outputs written to: {output_path.resolve()}")
 
-# --- Main Execution ---
-
-def main():
-    """Main function to run the aggregation process."""
-    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.3)")
-    parser.add_argument("-o", "--output", type=Path, default=OUTPUT_DIR, help=f"Output directory (default: {OUTPUT_DIR})")
-    parser.add_argument("-d", "--debug", action="store_true", help="Enable DEBUG logging")
-    parser.add_argument("-p", "--priority-cap", type=int, default=PRIORITY_CAP_DEFAULT, help=f"Maximum size for the priority list (default: {PRIORITY_CAP_DEFAULT:,})")
-    parser.add_argument("-w", "--max-workers", type=int, default=MAX_WORKERS_DEFAULT, help=f"Maximum concurrent network workers (aiohttp limit, default: {MAX_WORKERS_DEFAULT})")
-    parser.add_argument("-v", "--verbose-report", action="store_true", help="Write a detailed CSV report of all excluded domains.")
-    parser.add_argument("-f", "--output-format", choices=['raw', 'hosts'], default='raw', help="Output format for the priority list ('raw' for Unbound/AdGuard DNS filter, 'hosts' for Pi-hole/etc.)")
-    parser.add_argument("--cleanup-cache", action="store_true", help=f"Delete old cache and archive files (> {CACHE_CLEANUP_DAYS} days).") # ADDED ARG
-    parser.add_argument("--test", action="store_true", help="Run internal integrity tests and exit.") # ADDED ARG
-    args = parser.parse_args()
-    
-    # --- Internal Test Suite ---
-    if args.test:
-        return run_tests(args.output, ConsoleLogger(args.debug))
-    # --- End Test Suite ---
-
-    logger = ConsoleLogger(args.debug)
-    output_path = args.output
-    output_path.mkdir(exist_ok=True)
-    
-    priority_cap_val = args.priority_cap
-    max_workers_val = args.max_workers
-    output_format_val = args.output_format
-    
-    start = datetime.now()
-    logger.info("--- 🚀 Starting Singularity DNS Aggregation (v5.3 - FINALIZED) ---")
-    
-    if args.cleanup_cache:
-        cleanup_old_files(output_path, logger)
-    
-    # === SCOPE INITIALIZATION ===
-    priority_set: Set[str] = set()
-    tld_exclusion_counter: Counter = Counter()
-    excluded_domains_verbose: List[Dict[str, Any]] = []
-    # ============================
-
-    try:
-        history_path = output_path / HISTORY_FILENAME
-        report_path = output_path / REPORT_FILENAME
-        image_path = output_path / "score_distribution_chart.png"
-        dashboard_html_path = output_path / DASHBOARD_HTML
-        
-        # 1. Fetch & Process (Run the async function)
-        source_sets, all_domains_from_sources = asyncio.run(fetch_and_process_sources_async(max_workers_val, logger))
-        
-        # 2. Aggregate & Score
-        combined_counter, overlap_counter, domain_sources = aggregate_and_score_domains(source_sets)
-        total_unfiltered = len(combined_counter)
-        
-        # 3. Filter & Prioritize
-        priority_set, abused_tlds, excluded_count, full_filtered, tld_exclusion_counter, excluded_domains_verbose = filter_and_prioritize(
-            combined_counter, logger, priority_cap_val
-        )
-
-        # 4. History Tracking & Metrics 
-        priority_count = len(priority_set)
-        change, history = track_history(total_unfiltered, history_path, logger)
-        source_metrics = calculate_source_metrics(
-            priority_set, full_filtered, overlap_counter, domain_sources, all_domains_from_sources, logger
-        )
-        
-        # 5. Priority List Change Tracking 
-        change_report = track_priority_changes(
-            priority_set, combined_counter, domain_sources, full_filtered, logger
-        )
-
-        # 6. Reporting & Visualization
-        generate_static_score_histogram(combined_counter, full_filtered, image_path, logger)
-        generate_interactive_dashboard(
-            full_filtered, combined_counter, domain_sources, dashboard_html_path, logger
-        )
-        generate_markdown_report(
-            priority_count, change, total_unfiltered, excluded_count, full_filtered, combined_counter,
-            overlap_counter, report_path, dashboard_html_path, source_metrics, history, logger,
-            domain_sources, change_report, tld_exclusion_counter, priority_cap_val, excluded_domains_verbose
-        )
-        
-        # 7. File Writing
-        write_output_files(
-            priority_set, abused_tlds, full_filtered, output_path, logger, priority_cap_val,
-            excluded_domains_verbose, args.verbose_report, output_format_val
-        )
-        
-    except Exception as e:
-        logger.error(f"FATAL ERROR during execution: {e.__class__.__name__}: {e}")
-        if args.debug:
-            import traceback
-            traceback.print_exc()
-        sys.exit(1)
-        
-    logger.info(f"--- ✅ Aggregation Complete in {(datetime.now() - start).total_seconds():.2f}s ---")
-
 # --- Test Functions (Placeholder for future development) ---
 def run_tests(output_path, logger):
     logger.info("--- 🧪 Running Internal Integrity Tests ---")
     
-    # Test 1: Punycode normalization
     test_domains = {
         "xn--fzc.com": "xn--fzc.com", # Already punycode
-        "bücher.de": "xn--bcher-kva.de", # Unicode
+        "bücher.de": "xn--bcher-kva.de", # Unicode -> Punycode
         "google.com^$script": "google.com", # ABP cleanup
+        "0.0.0.0 bad.com": "bad.com", # Hosts file format
         "1.2.3.4": None, # IPv4 rejection
-        "0.0.0.0 bad.com": "bad.com" # Hosts file format
+        "||tracker.com^": "tracker.com" # ABP full cleanup
     }
     
     passed = 0
