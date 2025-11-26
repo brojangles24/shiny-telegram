@@ -1,13 +1,13 @@
 # 🛡️ Singularity DNS Blocklist Dashboard
-*Generated: 2025-11-26 04:34:38*
+*Generated: 2025-11-26 04:46:39*
 
 ## 📜 Aggregation Summary
 | Metric | Count | Insight |
 | :--- | :---: | :--- |
-| **Total Unique Domains** | **534,610** | Overall size of the unfiltered, validated pool. |
-| Change vs. Last Run | `+0` ➡️ | Trend in the total unique domain pool. |
+| **Total Scored Domains** | **534,610** | Size of the list including TLD rejected entries. |
+| Change vs. Last Run | `+534610` ⬆️ | Trend in the total unique domain pool. |
 | Priority List Size | 300,000 | Capped domains selected (Cap: **300,000**). |
-| High Consensus (Score 6+) | 99,443 | Domains backed by strong weighted evidence. |
+| High Consensus (Score 6+) | 131,901 | Domains backed by strong weighted evidence. |
 | TLD Filter Exclusions | 66,078 | Domains rejected by the abusive TLD list. |
 
 ---
@@ -16,16 +16,16 @@
 These are the highest-scoring domains that failed to make the final list:
 | Domain | Weighted Score | Exclusion Reason |
 | :--- | :---: | :--- |
-| `stats.ozwebsites.biz` | <span style='color:red;'>**15**</span> | TLD Rejected: **.biz is marked as abusive.** |
-| `zlp6s.pw` | <span style='color:red;'>**15**</span> | TLD Rejected: **.pw is marked as abusive.** |
+| `adop.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
 | `adserve.work` | <span style='color:red;'>**15**</span> | TLD Rejected: **.work is marked as abusive.** |
 | `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
+| `zlp6s.pw` | <span style='color:red;'>**15**</span> | TLD Rejected: **.pw is marked as abusive.** |
 | `crosspromotion.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `file-7.ru` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `celinehandbagsonsale.net` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `jenniferaustin.typeform.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `winddns.hopto.org` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `nsc-ru.weebly.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `mymsupport.fr` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `instruktors.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `mon-tabac.fr` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `strouranak.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `chitral.net` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
 
 *The complete list of 234,610 excluded domains is available in `excluded_domains_report.csv` for deeper analysis.*
 
