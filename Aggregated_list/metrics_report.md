@@ -1,18 +1,18 @@
 # 🛡️ Singularity DNS Blocklist Dashboard
-*Generated: 2025-11-26 00:28:12*
+*Generated: 2025-11-26 00:41:09*
 
 ## 📜 Historical Trends
 | Metric | Count | 7-Day Trend |
 | :--- | :--- | :--- |
-| **Priority List Size** | **300,000** | <span style='color:gray;'>`+0` ➡️</span> &nbsp; **██** |
-| **Trend Window** | 2025-11-25 to 2025-11-26 | |
+| **Total Unique Domains** | **487,307** | <span style='color:green;'>`+487307` ⬆️</span> &nbsp; **█** |
+| **Trend Window** | 2025-11-26 to 2025-11-26 | |
 
 ## 🔑 Summary Metrics
 | Metric | Count | Details |
 | :--- | :--- | :--- |
-| Domains with **High Consensus (Score 8+)** | 0 | Highest consensus domains. |
+| Domains with **High Consensus (Score 8+)** | 28,714 | Highest consensus domains. |
 | Domains Excluded by TLD Filter| 60,449 | TLD filter efficacy metric. |
-| Total Unique Domains (Pre-Filter) | 487,307 | Total candidates before TLD cleanup. |
+| Priority List Size | 300,000 | Capped domains selected from full list. |
 
 ---
 
