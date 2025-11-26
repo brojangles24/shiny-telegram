@@ -2,9 +2,9 @@
 """
 🚀 Singularity DNS Blocklist Aggregator (v4.6 - Final Stable Edition)
 
-- 🔥 **ADGUARD_DNS REMOVED:** Script simplified for maximum stability by removing the complex ABP-formatted list.
+- 🔥 ADGUARD_DNS REMOVED: Script simplified for maximum stability by removing the complex ABP-formatted list.
 - ⚡ Implements HTTP Caching (ETag/Last-Modified) for efficient fetching.
-- 🔒 Robust domain processing handles filter syntax and explicitly filters out IP addresses.
+- 🔒 Robust domain processing IGNORES filter rules/comments and EXPLICITLY FILTERS OUT IP ADDRESSES.
 - ⚖️ Uses custom weighted scoring (Max Score = 14) and tracks source overlap.
 - 📈 Generates rich Markdown reports with historical sparklines and detailed source metrics.
 """
@@ -41,7 +41,6 @@ BLOCKLIST_SOURCES: Dict[str, str] = {
     "STEVENBLACK_HOSTS": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
     "ANUDEEP_ADSERVERS": "https://raw.githubusercontent.com/anudeepND/blacklist/master/adservers.txt",
     "ADAWAY_HOSTS": "https://adaway.org/hosts.txt",
-    # ADGUARD_DNS removed for stability
 }
 HAGEZI_ABUSED_TLDS: str = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/spam-tlds-onlydomains.txt"
 
@@ -58,9 +57,9 @@ CACHE_FILE = OUTPUT_DIR / "fetch_cache.json"
 
 # Scoring and style
 PRIORITY_CAP = 300_000
-CONSENSUS_THRESHOLD = 8 # Threshold for "High Consensus" domains (still relevant)
+CONSENSUS_THRESHOLD = 8 # Threshold for "High Consensus" domains
 
-# CUSTOM WEIGHTS: (ADGUARD's weight of 3 is removed)
+# CUSTOM WEIGHTS: (Max Score is 14)
 SOURCE_WEIGHTS: Dict[str, int] = {
     "HAGEZI_ULTIMATE": 4,
     "1HOSTS_LITE": 3,
@@ -69,7 +68,7 @@ SOURCE_WEIGHTS: Dict[str, int] = {
     "ADAWAY_HOSTS": 2,
     "STEVENBLACK_HOSTS": 1
 }
-MAX_SCORE = sum(SOURCE_WEIGHTS.values()) # Now 4 + 3 + 2 + 2 + 2 + 1 = 14
+MAX_SCORE = sum(SOURCE_WEIGHTS.values()) # 14
 
 # Color-coded sources for better reporting/visualization
 SOURCE_COLORS = {
@@ -79,7 +78,6 @@ SOURCE_COLORS = {
     "STEVENBLACK_HOSTS": "#ff7f0e",
     "ANUDEEP_ADSERVERS": "#9467bd",
     "ADAWAY_HOSTS": "#8c564b",
-    # ADGUARD_DNS color removed
 }
 ASCII_SPARKLINE_CHARS = " ▂▃▄▅▆▇█"
 
@@ -192,7 +190,7 @@ def process_domain(line: str) -> Optional[str]:
 
     if not domain: return None
     
-    # 4. Exclusion of reserved names AND IP ADDRESSES (NEW CHECK)
+    # 4. Exclusion of reserved names AND IP ADDRESSES (CRITICAL CHECK)
     if domain in ("localhost", "localhost.localdomain", "::1", "255.255.255.255", "wpad"):
         return None
     
