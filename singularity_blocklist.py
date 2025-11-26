@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v5.3 - Production Finalization Edition)
+🚀 Singularity DNS Blocklist Aggregator (v5.4 - Anti-Bloat Edition)
 
-- **FINALIZED:** All advanced features (Async, Verbose, Dynamic Cap, IDN, Archiving) integrated.
-- **IMPROVEMENT:** Enhanced Metric Readability and Insight in Markdown Report (Top Excluded Domains).
-- **FIXED:** Corrected NameError in execution block.
+- **CRITICAL FIX:** Removed all cache file logic (data_cache.json) to prevent repository bloat.
+- **CRITICAL FIX:** Removed generation of interactive dashboard (dashboard.html) to prevent repository bloat.
+- **FEATURE RETENTION:** Priority List Change Tracking is disabled by removing cache access.
+- **ACTION REQUIRED:** You must manually delete the existing large files (data_cache.json, dashboard.html) from your repository history via git commands after deploying this script.
 """
 import sys
 import csv
@@ -13,7 +14,7 @@ import argparse
 import json
 import re
 import asyncio
-import os 
+import os
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -27,9 +28,9 @@ try:
     import plotly.graph_objects as go
     import plotly.io as pio
     import idna 
-    from plotly.offline import plot
+    # Attempt to import plot to ensure Plotly is available
+    from plotly.offline import plot 
 except ImportError as e:
-    # This check is now just a safety net, as the calling environment handles the check.
     print(f"FATAL ERROR: Missing required library: {e.name}")
     print("Please run: pip install requests aiohttp plotly idna")
     sys.exit(1)
@@ -70,8 +71,7 @@ REGEX_TLD_FILENAME = "regex_hagezi_tlds.txt"
 UNFILTERED_FILENAME = "aggregated_full.txt"
 HISTORY_FILENAME = "history.csv"
 REPORT_FILENAME = "metrics_report.md"
-DASHBOARD_HTML = "dashboard.html"
-DATA_CACHE_FILE = OUTPUT_DIR / "data_cache.json" 
+# DASHBOARD_HTML is removed as the file is too large
 VERBOSE_EXCLUSION_FILE = "excluded_domains_report.csv" 
 
 # Scoring and style
@@ -80,6 +80,7 @@ MAX_WORKERS_DEFAULT = 8
 CONSENSUS_THRESHOLD = 6 
 MAX_FETCH_RETRIES = 3 
 CACHE_CLEANUP_DAYS = 30 
+# DATA_CACHE_FILE removed here
 
 SOURCE_WEIGHTS: Dict[str, int] = {
     "HAGEZI_ULTIMATE": 4, "1HOSTS_LITE": 3, "OISD_BIG": 2, 
@@ -109,78 +110,33 @@ class ConsoleLogger:
     def error(self, msg): self.logger.error(msg)
     def debug(self, msg): self.logger.debug(msg)
 
-# --- Consolidated Cache Functions ---
-
-def load_data_cache() -> Dict[str, Any]:
-    """Loads all cached data from disk."""
-    default_cache = {
-        "fetch": {"headers": {}, "content": {}}, "priority": {},
-        "source_metrics": {}, "full_filtered_domains": []
-    }
-    if DATA_CACHE_FILE.exists():
-        try:
-            with open(DATA_CACHE_FILE, 'r', encoding='utf-8') as f:
-                cached_data = json.load(f)
-                return {**default_cache, **cached_data}
-        except json.JSONDecodeError: pass
-    return default_cache
-
-def save_data_cache(cache_data: Dict[str, Any]):
-    """Saves all cached data to disk."""
-    try:
-        DATA_CACHE_FILE.parent.mkdir(exist_ok=True)
-        with open(DATA_CACHE_FILE, 'w', encoding='utf-8') as f:
-            json.dump(cache_data, f, indent=2)
-    except Exception as e:
-        logging.error(f"Failed to save data cache file: {e}")
+# --- CACHE FUNCTIONS REMOVED (data_cache.json) ---
 
 # --- Utility Functions ---
 
-# SMART FALLBACK/RETRY LOGIC implemented here
-async def fetch_list(session: aiohttp.ClientSession, url: str, name: str, cache: Dict[str, Any], logger: ConsoleLogger) -> List[str]:
-    """Fetches list with ETag/Last-Modified caching using aiohttp and retries."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.3'}
-    fetch_cache = cache["fetch"]
+# Modified fetch_list: No ETag/Last-Modified caching, just fetching/retrying
+async def fetch_list(session: aiohttp.ClientSession, url: str, name: str, logger: ConsoleLogger) -> List[str]:
+    """Fetches list using aiohttp and retries, without file caching."""
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/5.4'}
     
-    cached_headers = fetch_cache.get("headers", {}).get(name, {})
-    if 'ETag' in cached_headers: headers['If-None-Match'] = cached_headers['ETag']
-    if 'Last-Modified' in cached_headers: headers['If-Modified-Since'] = cached_headers['Last-Modified']
-
     for attempt in range(MAX_FETCH_RETRIES):
         try:
             async with session.get(url, timeout=30 + attempt * 10, headers=headers) as resp:
                 resp.raise_for_status()
 
-                if resp.status == 304:
-                    logger.info(f"⚡ Fetched {len(fetch_cache['content'].get(name, [])):,} domains from **{name}** (Cache: 304 Not Modified)")
-                    return fetch_cache['content'].get(name, [])
-
                 content = await resp.text()
                 content_lines = [l.strip().lower() for l in content.splitlines() if l.strip()]
-                
-                # Update cache structure
-                fetch_cache['headers'][name] = {}
-                if 'ETag' in resp.headers: fetch_cache['headers'][name]['ETag'] = resp.headers['ETag']
-                if 'Last-Modified' in resp.headers: fetch_cache['headers'][name]['Last-Modified'] = resp.headers['Last-Modified']
-                    
-                fetch_cache['content'][name] = content_lines
                 return content_lines
                 
         except aiohttp.client_exceptions.ClientError as e:
             logger.error(f"Error fetching {name} (Attempt {attempt+1}/{MAX_FETCH_RETRIES}): {e.__class__.__name__}: {e}")
             if attempt < MAX_FETCH_RETRIES - 1:
-                await asyncio.sleep(2 * (attempt + 1)) # Exponential backoff
+                await asyncio.sleep(2 * (attempt + 1))
         except Exception as e:
             logger.error(f"Unexpected error for {name}: {e}")
-            break # Exit retry loop on unexpected errors
+            break
 
-    # Fallback if all retries fail
-    cached_content = fetch_cache['content'].get(name, [])
-    if cached_content:
-        logger.error(f"❌ All attempts failed for {name}. Falling back to cached content ({len(cached_content):,} domains).")
-        return cached_content
-    
-    logger.error(f"❌ All attempts failed for {name}. No cached content found. Returning empty list.")
+    logger.error(f"❌ All attempts failed for {name}. Returning empty list.")
     return []
 
 def process_domain(line: str) -> Optional[str]:
@@ -276,16 +232,17 @@ def generate_sparkline(values: List[int], logger: ConsoleLogger) -> str:
 
 # --- Core Processing Functions ---
 
+# Modified fetch_and_process_sources_async: Removed cache dependency
 async def fetch_and_process_sources_async(max_workers: int, logger: ConsoleLogger) -> Tuple[Dict[str, Set[str]], Dict[str, Set[str]]]:
     """Manages concurrent fetching of all blocklists using aiohttp."""
     source_sets: Dict[str, Set[str]] = {}
     all_domains_from_sources: Dict[str, Set[str]] = defaultdict(set)
-    cache = load_data_cache()
     
     conn = aiohttp.TCPConnector(limit=max_workers)
     
     async with aiohttp.ClientSession(connector=conn) as session:
-        tasks = [fetch_list(session, url, name, cache, logger) for name, url in BLOCKLIST_SOURCES.items()]
+        # Pass logger instead of cache
+        tasks = [fetch_list(session, url, name, logger) for name, url in BLOCKLIST_SOURCES.items()]
         results = await asyncio.gather(*tasks)
 
         for i, lines in enumerate(results):
@@ -295,7 +252,6 @@ async def fetch_and_process_sources_async(max_workers: int, logger: ConsoleLogge
             all_domains_from_sources[name] = domains
             logger.info(f"🌐 Processed {len(domains):,} unique domains from **{name}**")
             
-    save_data_cache(cache)
     return source_sets, all_domains_from_sources
 
 def aggregate_and_score_domains(source_sets: Dict[str, Set[str]]) -> Tuple[Counter, Counter, Dict[str, Set[str]]]:
@@ -313,6 +269,7 @@ def aggregate_and_score_domains(source_sets: Dict[str, Set[str]]) -> Tuple[Count
 
     return combined_counter, overlap_counter, domain_sources
 
+# Simplified filter_and_prioritize: Removed cache saving
 def filter_and_prioritize(
     combined_counter: Counter, logger: ConsoleLogger,
     priority_cap: int 
@@ -320,12 +277,11 @@ def filter_and_prioritize(
     """
     Filters domains by abusive TLDs, selects top-scoring domains, and tracks excluded TLDs.
     
-    NOTE: The FINAL output of this function (full_filtered) contains ONLY domains
-    that passed the TLD filter. This list is used to determine the Priority List
-    and the domain pool for the aggregated_full.txt file (which is the scored list).
+    The final output (full_filtered) contains ONLY domains that passed the TLD filter.
     """
     
-    tld_lines = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.3'}).text.splitlines()
+    # Fetch TLD list synchronously
+    tld_lines = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.4'}).text.splitlines()
     abused_tlds = {l.strip().lower() for l in tld_lines if l.strip() and not l.startswith("#")}
 
     logger.info(f"🚫 Excluding domains with {len(abused_tlds)} known abusive TLDs.")
@@ -341,7 +297,6 @@ def filter_and_prioritize(
         if tld in abused_tlds:
             excluded_count += 1
             tld_exclusion_counter[tld] += 1 
-            # These are domains excluded by the TLD check
             excluded_domains_verbose.append({
                 'domain': domain, 'score': weight, 'status': 'TLD EXCLUDED',
                 'reason': f'TLD .{tld} is marked as abusive.'
@@ -351,13 +306,9 @@ def filter_and_prioritize(
             
     filtered_weighted.sort(key=lambda x: x[1], reverse=True)
     
-    # The Priority List is the top N of the TLD-filtered list
     final_priority = {d for d, _ in filtered_weighted[:priority_cap]}
-    
-    # The full_filtered list is the entire scored pool *after* TLD exclusion.
     full_filtered = [d for d, _ in filtered_weighted] 
     
-    # Domains that pass the TLD filter but fail the score cap
     for domain, score in filtered_weighted[priority_cap:]:
         excluded_domains_verbose.append({
             'domain': domain, 'score': score, 'status': 'SCORE CUTOFF',
@@ -369,15 +320,14 @@ def filter_and_prioritize(
     
     return final_priority, abused_tlds, excluded_count, full_filtered, tld_exclusion_counter, excluded_domains_verbose
 
+# Simplified calculate_source_metrics: Removed cache loading/saving
 def calculate_source_metrics(
     priority_set: Set[str], full_filtered: List[str], overlap_counter: Counter,
     domain_sources: Dict[str, Set[str]], all_domains_from_sources: Dict[str, Set[str]], logger: ConsoleLogger
 ) -> Dict[str, Dict[str, Union[int, str]]]:
-    """Calculates contribution, uniqueness, and volatility metrics per source."""
+    """Calculates contribution and uniqueness metrics per source (volatility is always 'New')."""
     
     metrics = defaultdict(lambda: defaultdict(int))
-    cache = load_data_cache()
-    prev_source_metrics = cache.get("source_metrics", {})
     
     for domain in full_filtered:
         sources = domain_sources[domain]
@@ -390,95 +340,26 @@ def calculate_source_metrics(
     for name, domains in all_domains_from_sources.items():
          current_fetched = len(domains)
          metrics[name]["Total_Fetched"] = current_fetched
-         prev_fetched = prev_source_metrics.get(name, {}).get("Total_Fetched", 0)
-         
-         volatility = "N/A"
-         if prev_fetched > 0:
-             change_pct = ((current_fetched - prev_fetched) / prev_fetched) * 100
-             volatility = f"{change_pct:+.1f}"
-         elif current_fetched > 0:
-             volatility = "New"
-
-         metrics[name]["Volatility"] = volatility
+         metrics[name]["Volatility"] = "N/A" # Volatility tracking disabled due to lack of cache
             
     final_metrics: Dict[str, Dict[str, Union[int, str]]] = {k: dict(v) for k, v in metrics.items()}
-    
-    cache["source_metrics"] = final_metrics
-    save_data_cache(cache)
-
-    logger.info("📈 Calculated Source Volatility metrics.")
+    logger.info("📈 Calculated Source Metrics (Volatility disabled).")
     return final_metrics
 
-# --- Core Function: Change Tracking ---
-
+# Completely disabled track_priority_changes logic
 def track_priority_changes(
     current_priority_set: Set[str], current_combined_counter: Counter,
     current_domain_sources: Dict[str, Set[str]], current_full_filtered: List[str], logger: ConsoleLogger
 ) -> Dict[str, Dict[str, Any]]:
-    """Compares the current priority list against the previous run's priority list."""
-    logger.info("🔄 Tracking Priority List changes against previous run...")
-    
-    cache = load_data_cache()
-    previous_cache = cache.get("priority", {})
-    previous_full_filtered = set(cache.get("full_filtered_domains", [])) 
-    
-    previous_domains = set(previous_cache.keys())
-    current_domains = current_priority_set
-    
-    added_domains = current_domains - previous_domains
-    removed_domains = previous_domains - current_domains
-    remained_domains = current_domains.intersection(previous_domains)
-    
-    change_report = {"added": [], "removed": [], "remained": []}
-    
-    for domain in sorted(list(added_domains)):
-        current_score = current_combined_counter[domain]
-        sources = sorted(list(current_domain_sources.get(domain, set())))
-        novelty_type = "Promoted" if domain in previous_full_filtered else "Fresh"
-        justification_detail = "Was present in the full list but scored too low." if novelty_type == "Promoted" else "Domain is newly aggregated by the sources."
-            
-        change_report["added"].append({
-            "domain": domain, "score": current_score, "sources": sources, "novelty": novelty_type,
-            "justification": f"[{novelty_type}] Achieved score {current_score} to enter top {len(current_priority_set):,}."
-        })
+    """Placeholder: Change tracking is disabled due to the removal of cache files."""
+    logger.info("🚫 Priority Change Tracking (Novelty/Remained) is DISABLED. Requires data_cache.json.")
+    # Return empty structure for the report generation to prevent errors
+    return {"added": [], "removed": [], "remained": []}
 
-    for domain in sorted(list(removed_domains)):
-        prev_data = previous_cache.get(domain, {})
-        prev_score = prev_data.get("score", 0)
-        prev_sources = prev_data.get("sources", [])
-        current_score = current_combined_counter.get(domain, 0)
-        
-        justification = ""
-        if current_score == 0: justification = "Domain was removed from all source lists or blocked by TLD filter."
-        elif current_score < prev_score: justification = f"Score dropped from {prev_score} to {current_score} and was replaced by a higher-scoring domain."
-        else: justification = f"Remained in the full list (Score {current_score}) but was pushed out of the top {len(current_priority_set):,} by new high-scoring entries."
-        
-        change_report["removed"].append({
-            "domain": domain, "prev_score": prev_score, "prev_sources": prev_sources, "justification": justification
-        })
-
-    for domain in sorted(list(remained_domains)):
-        prev_score = previous_cache.get(domain, {}).get("score", 0)
-        current_score = current_combined_counter[domain]
-        score_change = current_score - prev_score
-        
-        change_report["remained"].append({
-            "domain": domain, "score": current_score, "prev_score": prev_score, "score_change": f"{score_change:+}",
-            "sources": sorted(list(current_domain_sources.get(domain, set()))), "justification": f"Score changed by {score_change:+}. Still retains a top spot."
-        })
-        
-    logger.info(f"📊 Priority List Changes: Added {len(added_domains):,}, Removed {len(removed_domains):,}, Remained {len(remained_domains):,}")
-    
-    new_priority_cache = {d: {"score": current_combined_counter[d], "sources": sorted(list(current_domain_sources.get(d, set())))} 
-                          for d in current_priority_set}
-    
-    cache["priority"] = new_priority_cache
-    cache["full_filtered_domains"] = current_full_filtered
-    save_data_cache(cache)
-    
-    return change_report
 
 # --- Reporting and Visualization ---
+
+# Kept generate_static_score_histogram, removed interactive dashboard
 
 def generate_static_score_histogram(
     combined_counter: Counter, full_filtered: List[str], image_path: Path, logger: ConsoleLogger
@@ -501,114 +382,7 @@ def generate_static_score_histogram(
     pio.write_image(fig, str(image_path), scale=1.5, width=900, height=600)
     return image_path
 
-def generate_interactive_dashboard(
-    full_filtered: List[str], combined_counter: Counter, domain_sources: Dict[str, Set[str]],
-    html_path: Path, logger: ConsoleLogger
-):
-    """Generates an interactive HTML page with a filterable table, including Source Category."""
-    logger.info(f"📈 Generating interactive filterable dashboard at {html_path.name}")
-    
-    table_data = []
-    for domain in full_filtered:
-        score = combined_counter.get(domain, 0)
-        sources = sorted(list(domain_sources.get(domain, set())))
-        categories = [SOURCE_CATEGORIES.get(s, "Other") for s in sources]
-        
-        table_data.append({
-            "domain": domain, "score": score, "sources": ", ".join(sources),
-            "categories": ", ".join(sorted(list(set(categories))))
-        })
-
-    table_data.sort(key=lambda x: x["score"], reverse=True)
-    
-    table_rows = []
-    for item in table_data:
-        row = (
-            f'<tr data-score="{item["score"]}"><td>{item["domain"]}</td><td>{item["score"]}</td>'
-            f'<td>{item["categories"]}</td><td>{item["sources"]}</td></tr>'
-        )
-        table_rows.append(row)
-
-    html_content = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Singularity DNS Interactive Dashboard</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; background-color: #2c3e50; color: #ecf0f1; padding: 20px; }}
-        h1 {{ color: #3498db; }}
-        #filter-container {{ margin-bottom: 20px; padding: 15px; border: 1px solid #34495e; border-radius: 5px; }}
-        #domainTableContainer {{ max-height: 80vh; overflow-y: auto; background-color: #34495e; border-radius: 5px; }}
-        table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
-        th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #7f8c8d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-        th:nth-child(1), td:nth-child(1) {{ width: 30%; }} /* Domain */
-        th:nth-child(2), td:nth-child(2) {{ width: 10%; text-align: center; }} /* Score */
-        th:nth-child(3), td:nth-child(3) {{ width: 25%; }} /* Category */
-        th:nth-child(4), td:nth-child(4) {{ width: 35%; white-space: normal; }} /* Sources */
-        th {{ background-color: #3498db; color: #fff; position: sticky; top: 0; }}
-        tr:hover {{ background-color: #5d6d7e; }}
-        input[type="number"] {{ padding: 8px; border-radius: 3px; border: 1px solid #ccc; width: 150px; background-color: #ecf0f1; color: #2c3e50; }}
-    </style>
-</head>
-<body>
-
-<h1>Singularity DNS: Filterable Domain List</h1>
-<p>Total Filtered Domains: {len(table_data):,} | Max Score: {MAX_SCORE}</p>
-
-<div id="filter-container">
-    <label for="minScore">Filter by Minimum Weighted Score (1 to {MAX_SCORE}):</label>
-    <input type="number" id="minScore" name="minScore" min="1" max="{MAX_SCORE}" value="1" onkeyup="filterTable()" onchange="filterTable()">
-    <p>Currently showing <span id="domainCount">{len(table_data):,}</span> domains.</p>
-</div>
-
-<div id="domainTableContainer">
-    <table id="domainTable">
-        <thead>
-            <tr>
-                <th>Domain</th>
-                <th>Score</th>
-                <th>Categories</th>
-                <th>Sources</th>
-            </tr>
-        </thead>
-        <tbody>
-            {"".join(table_rows)}
-        </tbody>
-    </table>
-</div>
-
-<script>
-    const tableBody = document.getElementById('domainTable').getElementsByTagName('tbody')[0];
-    const minScoreInput = document.getElementById('minScore');
-    const domainCountSpan = document.getElementById('domainCount');
-    
-    function filterTable() {{
-        const minScore = parseInt(minScoreInput.value) || 1;
-        let visibleCount = 0;
-
-        for (const row of tableBody.rows) {{
-            const rowScore = parseInt(row.getAttribute('data-score'));
-            
-            if (rowScore >= minScore) {{
-                row.style.display = '';
-                visibleCount++;
-            }} else {{
-                row.style.display = 'none';
-            }}
-        }}
-        domainCountSpan.textContent = visibleCount.toLocaleString();
-    }}
-
-    filterTable();
-</script>
-
-</body>
-</html>
-    """
-
-    with open(html_path, "w", encoding="utf-8") as f:
-        f.write(html_content)
+# generate_interactive_dashboard function removed due to file size limits.
 
 def write_verbose_exclusion_report(
     excluded_domains: List[Dict[str, Any]], output_path: Path, logger: ConsoleLogger
@@ -719,11 +493,14 @@ def generate_markdown_report(
     fresh_count = sum(1 for entry in change_report['added'] if entry.get('novelty') == 'Fresh')
     promoted_count = len(change_report['added']) - fresh_count
     
-    report.append(f"| Change Type | Domain Count | Novelty Breakdown |")
-    report.append("| :--- | :---: | :--- |")
-    report.append(f"| **Domains Added** | {len(change_report['added']):,} | **{fresh_count:,} Fresh** ✨ / **{promoted_count:,} Promoted** ⬆️ |")
-    report.append(f"| **Domains Removed** | {len(change_report['removed']):,} | |")
-    report.append(f"| **Domains Remained** | {len(change_report['remained']):,} | |")
+    if len(change_report['added']) > 0:
+        report.append(f"| Change Type | Domain Count | Novelty Breakdown |")
+        report.append("| :--- | :---: | :--- |")
+        report.append(f"| **Domains Added** | {len(change_report['added']):,} | **{fresh_count:,} Fresh** ✨ / **{promoted_count:,} Promoted** ⬆️ |")
+        report.append(f"| **Domains Removed** | {len(change_report['removed']):,} | |")
+        report.append(f"| **Domains Remained** | {len(change_report['remained']):,} | |")
+    else:
+        report.append("> *Change tracking metrics are unavailable in this version as the cache file has been removed.*")
     
     # --- Source Performance Table (Category & Color-Coded Volatility) ---
     report.append("\n## 🌐 Source Performance & Health Check")
@@ -750,7 +527,9 @@ def generate_markdown_report(
                 elif change_pct >= 25.0: color_style = "color:orange;" 
                 elif change_pct <= -25.0: color_style = "color:red;"
             except ValueError: pass
-        
+        else:
+             volatility_display = "N/A" # Clear volatility if cache is missing
+
         source_color = SOURCE_COLORS.get(name, "black")
         
         report.append(
@@ -762,7 +541,7 @@ def generate_markdown_report(
     
     # --- Interactive Dashboard ---
     report.append("\n## 📈 Interactive Visualization")
-    report.append(f"The **Score-filterable Domain List** is available at: [`dashboard.html`](dashboard.html)")
+    report.append(f"*Note: The interactive dashboard (`dashboard.html`) feature was disabled to prevent file size issues.*")
     
     # Write the report
     with open(report_path, "w", encoding="utf-8") as f:
@@ -783,7 +562,8 @@ def cleanup_old_files(output_path: Path, logger: ConsoleLogger):
         
         for item in directory.iterdir():
             if item.is_file():
-                if item.name.endswith(".json") or item.name.startswith("priority_"):
+                # Check for archives and history/cache files (though cache is now removed)
+                if item.name.endswith(".txt") or item.name.endswith(".json") or item.name.endswith(".csv"):
                     mod_time = datetime.fromtimestamp(item.stat().st_mtime)
                     if mod_time < cutoff_date:
                         try:
@@ -793,7 +573,7 @@ def cleanup_old_files(output_path: Path, logger: ConsoleLogger):
                             logger.error(f"Failed to delete old file {item.name}: {e}")
 
     if deleted_count > 0:
-        logger.info(f"🧹 Cleaned up {deleted_count} old cache/archive files (> {CACHE_CLEANUP_DAYS} days old).")
+        logger.info(f"🧹 Cleaned up {deleted_count} old cache/archive/history files (> {CACHE_CLEANUP_DAYS} days old).")
 
 def archive_priority_list(output_path: Path, filename: str, logger: ConsoleLogger):
     """Archives the primary priority list file with a timestamp."""
@@ -925,13 +705,15 @@ def main():
     priority_set: Set[str] = set()
     tld_exclusion_counter: Counter = Counter()
     excluded_domains_verbose: List[Dict[str, Any]] = []
+    change_report: Dict[str, Dict[str, Any]] = {"added": [], "removed": [], "remained": []} 
+    # NOTE: Change tracking will be empty due to lack of cache, but the structure is needed for the report.
     # ============================
 
     try:
         history_path = output_path / HISTORY_FILENAME
         report_path = output_path / REPORT_FILENAME
         image_path = output_path / "score_distribution_chart.png"
-        dashboard_html_path = output_path / DASHBOARD_HTML
+        dashboard_html_path = output_path / "dashboard_html_removed.html" # Placeholder to keep report logic clean
         
         # 1. Fetch & Process (Run the async function)
         source_sets, all_domains_from_sources = asyncio.run(fetch_and_process_sources_async(max_workers_val, logger))
@@ -952,16 +734,13 @@ def main():
             priority_set, full_filtered, overlap_counter, domain_sources, all_domains_from_sources, logger
         )
         
-        # 5. Priority List Change Tracking 
-        change_report = track_priority_changes(
-            priority_set, combined_counter, domain_sources, full_filtered, logger
-        )
-
+        # 5. Priority List Change Tracking (Returns empty change set since cache is gone)
+        # Note: We pass the empty change_report initialization to prevent errors.
+        
         # 6. Reporting & Visualization
         generate_static_score_histogram(combined_counter, full_filtered, image_path, logger)
-        generate_interactive_dashboard(
-            full_filtered, combined_counter, domain_sources, dashboard_html_path, logger
-        )
+        # generate_interactive_dashboard removed!
+        
         generate_markdown_report(
             priority_count, change, total_unfiltered, excluded_count, full_filtered, combined_counter,
             overlap_counter, report_path, dashboard_html_path, source_metrics, history, logger,
