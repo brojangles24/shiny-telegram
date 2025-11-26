@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-🚀 Singularity DNS Blocklist Aggregator (v4.2 - Final Filtering Edition)
+🚀 Singularity DNS Blocklist Aggregator (v4.6 - Final Stable Edition)
 
+- 🔥 ADGUARD_DNS REMOVED: Script simplified for maximum stability by removing the complex ABP-formatted list.
 - ⚡ Implements HTTP Caching (ETag/Last-Modified) for efficient fetching.
-- 🔒 Robust domain processing handles AdGuard syntax (||, ^, !) AND IGNORES WHITELIST RULES (@@).
-- ⚖️ Uses custom weighted scoring (4, 3, 2, 1) and tracks source overlap.
+- 🔒 Robust domain processing IGNORES filter rules/comments and EXPLICITLY FILTERS OUT IP ADDRESSES.
+- ⚖️ Uses custom weighted scoring (Max Score = 14) and tracks source overlap.
 - 📈 Generates rich Markdown reports with historical sparklines and detailed source metrics.
 """
 import sys
@@ -25,13 +26,14 @@ import plotly.io as pio
 
 # --- Configuration & Constants ---
 
-# Regular expression for robust domain validation. 
-# Ensures valid characters, length (max 253), and structure (requires at least one dot).
+# Regular expressions for validation
 DOMAIN_REGEX = re.compile(
     r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
 )
+# Simple pattern to catch common IPv4 addresses (e.g., 1.2.3.4)
+IPV4_REGEX = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
 
-# Define the sources for blocklists
+# Define the sources for blocklists (6 sources remaining)
 BLOCKLIST_SOURCES: Dict[str, str] = {
     "HAGEZI_ULTIMATE": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/ultimate-onlydomains.txt",
     "OISD_BIG": "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_big.txt",
@@ -67,7 +69,7 @@ SOURCE_WEIGHTS: Dict[str, int] = {
     "ADAWAY_HOSTS": 2,
     "STEVENBLACK_HOSTS": 1
 }
-MAX_SCORE = sum(SOURCE_WEIGHTS.values())
+MAX_SCORE = sum(SOURCE_WEIGHTS.values()) # 14
 
 # Color-coded sources for better reporting/visualization
 SOURCE_COLORS = {
@@ -77,7 +79,6 @@ SOURCE_COLORS = {
     "STEVENBLACK_HOSTS": "#ff7f0e",
     "ANUDEEP_ADSERVERS": "#9467bd",
     "ADAWAY_HOSTS": "#8c564b",
-    "ADGUARD_DNS": "#e377c2"
 }
 ASCII_SPARKLINE_CHARS = " ▂▃▄▅▆▇█"
 
@@ -125,7 +126,7 @@ def save_cache(cache_data: Dict[str, Any]):
 
 def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, Any], logger: ConsoleLogger) -> List[str]:
     """Fetches list with ETag/Last-Modified caching."""
-    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/4.2'}
+    headers = {'User-Agent': 'SingularityDNSBlocklistAggregator/4.6'}
     
     cached_headers = cache.get("headers", {}).get(name, {})
     if 'ETag' in cached_headers:
@@ -157,46 +158,48 @@ def fetch_list(url: str, name: str, session: requests.Session, cache: Dict[str, 
         return []
 
 def process_domain(line: str) -> Optional[str]:
-    """Cleans a line from a blocklist file, handles AdGuard syntax, and applies strict validation."""
+    """Cleans a line from a blocklist file, handles filter syntax, and explicitly rejects IP addresses."""
     
     if not line:
         return None
     
     line = line.strip().lower()
 
-    # 1. Ignore comment/empty lines AND CRITICALLY, Whitelist/Exception rules (@@)
+    # 1. Ignore comment/empty lines, Whitelist/Exception rules (@@, #, !, |)
     if line.startswith(("#", "!", "|", "@@")):
         return None
     
-    # 2. Handle AdGuard/ABP Syntax (||domain.com^$modifier)
-    if line.startswith("||"):
-        # Strip the start marker
-        domain = line.lstrip("||")
-        # Strip everything after a potential $ (rule modifier) or ^ (end marker)
-        if '$' in domain:
-            domain = domain.split('$')[0]
-        if '^' in domain:
-            domain = domain.split('^')[0]
-        
+    # 2. Handle Hosts file (0.0.0.0 domain) or standard format first
+    parts = line.split()
+    if len(parts) >= 2 and parts[0] in ("0.0.0.0", "127.0.0.1"):
+        domain = parts[1]
+    elif len(parts) >= 1 and not line.startswith('/'):
+        domain = parts[0]
     else:
-        # 3. Handle Hosts file (0.0.0.0 domain) or simple domain list
-        parts = line.split()
-        domain = parts[1] if len(parts) > 1 and parts[0] in ("0.0.0.0", "127.0.0.1") else parts[0] if len(parts) == 1 else None
-        
-        if not domain: return None
-        domain = domain.lstrip("*").lstrip(".")
+        domain = line # Fall through for filter syntax
 
-    # 4. Final cleanup of common trailing symbols (explicitly handles ^ if it wasn't stripped above)
-    if domain:
-        domain = domain.rstrip('^').rstrip('!')
-    
     if not domain: return None
     
-    # 5. Exclusion of reserved names
+    # 3. **AGGRESSIVE ABP CLEANUP**
+    # Strip all common filter markers from the domain candidate
+    domain = domain.lstrip("*").lstrip(".")
+    for char in ['||', '^', '$', '/', '#', '@', '&', '%', '?', '~']:
+        domain = domain.replace(char, ' ').strip()
+    
+    # Re-split after stripping to ensure we only take the first element (the domain)
+    domain = domain.split()[0] if domain else None
+
+    if not domain: return None
+    
+    # 4. Exclusion of reserved names AND IP ADDRESSES (CRITICAL CHECK)
     if domain in ("localhost", "localhost.localdomain", "::1", "255.255.255.255", "wpad"):
         return None
     
-    # 6. **STRICT REGEX VALIDATION**
+    # REJECT IPV4 ADDRESSES before spending time on complex domain regex
+    if IPV4_REGEX.match(domain):
+        return None
+    
+    # 5. **STRICT REGEX VALIDATION** (Final safety net)
     if not DOMAIN_REGEX.match(domain):
         return None
     
@@ -405,7 +408,7 @@ def generate_interactive_dashboard(
             x=[str(l) for l in overlap_levels],
             y=heatmap_data[src],
             name=src,
-            marker_color=SOURCE_COLORS[src],
+            marker_color=SOURCE_COLORS.get(src, "black"),
             hovertemplate="<b>Source:</b> %{name}<br><b>Overlap Level:</b> %{x}<br><b>Domains:</b> %{y:}<extra></extra>"
         ))
         
@@ -447,7 +450,6 @@ def generate_markdown_report(
     trend_icon = "⬆️" if change > 0 else "⬇️" if change < 0 else "➡️"
     trend_color = "green" if change > 0 else "red" if change < 0 else "gray"
     
-    # Calculate High Consensus Count based on the new threshold
     high_consensus_count = sum(1 for d in full_filtered_list if overlap_counter.get(d) >= CONSENSUS_THRESHOLD)
     
     # --- Historical Data ---
@@ -466,7 +468,6 @@ def generate_markdown_report(
     report.append("| Metric | Count | Details |")
     report.append("| :--- | :--- | :--- |")
     
-    # Updated metric to use CONSENSUS_THRESHOLD
     report.append(f"| Domains with **High Consensus (Score {CONSENSUS_THRESHOLD}+)** | {high_consensus_count:,} | Highest consensus domains. |")
     
     report.append(f"| Domains Excluded by TLD Filter| {excluded_count:,} | TLD filter efficacy metric. |")
@@ -561,7 +562,7 @@ def write_output_files(
 
 def main():
     """Main function to run the aggregation process."""
-    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v4.2)")
+    parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v4.6)")
     parser.add_argument(
         "-o", "--output", 
         type=Path, 
@@ -585,11 +586,20 @@ def main():
     if not Path("requirements.txt").exists():
         logger.info("💡 Recommendation: Create a 'requirements.txt' file for dependency management and stability.")
     
-    # --- Initialization to prevent NameError in outer scope (CRITICAL FIX) ---
-    priority_set, abused_tlds, full_filtered = set(), set(), []
-    combined_counter, overlap_counter, domain_sources = Counter(), Counter(), defaultdict(set)
-    all_domains_from_sources = defaultdict(set)
-    total_unfiltered, excluded_count = 0, 0 
+    # === CRITICAL: SCOPE INITIALIZATION (MUST BE HERE) ===
+    # All variables needed by functions called *after* the execution are initialized here.
+    priority_set: Set[str] = set()
+    abused_tlds: Set[str] = set()
+    full_filtered: List[str] = []
+    combined_counter: Counter = Counter()
+    overlap_counter: Counter = Counter()
+    domain_sources: Dict[str, Set[str]] = defaultdict(set)
+    all_domains_from_sources: Dict[str, Set[str]] = defaultdict(set)
+    total_unfiltered: int = 0
+    excluded_count: int = 0 
+    history: List[Dict[str, str]] = []
+    change: int = 0
+    # ======================================================
 
     try:
         history_path = output_path / HISTORY_FILENAME
@@ -597,27 +607,30 @@ def main():
         heatmap_image_path = output_path / "score_distribution_chart.png"
         dashboard_html_path = output_path / DASHBOARD_HTML
         
+        temp_source_sets = {} # Placeholder for results from the session block
+        
         with requests.Session() as session:
-            # 1. Fetch & Process (with Caching)
-            source_sets, all_domains_from_sources = fetch_and_process_sources(session, logger)
+            # 1. Fetch & Process (Variables POPULATED here)
+            temp_source_sets, all_domains_from_sources = fetch_and_process_sources(session, logger)
             
-            # 2. Aggregate & Score
-            combined_counter, overlap_counter, domain_sources = aggregate_and_score_domains(source_sets)
+            # 2. Aggregate & Score (Variables POPULATED here)
+            combined_counter, overlap_counter, domain_sources = aggregate_and_score_domains(temp_source_sets)
             total_unfiltered = len(combined_counter)
             logger.info(f"✨ Total unique domains across all sources: {total_unfiltered:,}")
             
-            # 3. Filter & Prioritize
+            # 3. Filter & Prioritize (Variables POPULATED here)
             priority_set, abused_tlds, excluded_count, full_filtered = filter_and_prioritize(
                 combined_counter, 
                 session, 
                 logger
             )
 
-        # 4. History Tracking & Metrics (Runs outside the session block)
+        # 4. History Tracking & Metrics (Runs outside the session block, access is safe)
         priority_count = len(priority_set)
         change, history = track_history(priority_count, history_path, logger)
         logger.info(f"📜 History tracked. Priority list change vs. last run: {change:+}")
         
+        # All required reporting variables are now populated and accessible
         source_metrics = calculate_source_metrics(priority_set, full_filtered, overlap_counter, domain_sources, all_domains_from_sources)
 
         # 5. Reporting & Visualization
