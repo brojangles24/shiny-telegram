@@ -1,11 +1,11 @@
 # 🛡️ Singularity DNS Blocklist Dashboard
-*Generated: 2025-11-26 05:11:02*
+*Generated: 2025-11-26 06:16:43*
 
 ## 📜 Aggregation Summary
 | Metric | Count | Insight |
 | :--- | :---: | :--- |
 | **Total Scored Domains** | **534,629** | Size of the list including TLD rejected entries. |
-| Change vs. Last Run | `+19` ⬆️ | Trend in the total unique domain pool. |
+| Change vs. Last Run | `+0` ➡️ | Trend in the total unique domain pool. |
 | Priority List Size | 300,000 | Capped domains selected (Cap: **300,000**). |
 | High Consensus (Score 6+) | 131,901 | Domains backed by strong weighted evidence. |
 | TLD Filter Exclusions | 66,089 | Domains rejected by the abusive TLD list. |
@@ -16,16 +16,16 @@
 These are the highest-scoring domains that failed to make the final list:
 | Domain | Weighted Score | Exclusion Reason |
 | :--- | :---: | :--- |
-| `crosspromotion.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
-| `zlp6s.pw` | <span style='color:red;'>**15**</span> | TLD Rejected: **.pw is marked as abusive.** |
-| `adop.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
 | `adserve.work` | <span style='color:red;'>**15**</span> | TLD Rejected: **.work is marked as abusive.** |
-| `accumvasod.pro` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `segnaeguag.pro` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `bafkreietpsmewf6rkkj63ojm7yqkd2mk2w4ftmigztpxfvulckqryepmki.ipfs.dweb.link` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `yucattan.weebly.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
-| `nexa-valeo.net` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `crosspromotion.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `stats.ozwebsites.biz` | <span style='color:red;'>**15**</span> | TLD Rejected: **.biz is marked as abusive.** |
+| `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
+| `adop.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `deathtrapet.info` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `gevertixon.net` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `wowclick.in` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `oceautoelevadores.com.ar` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
+| `lokatapipelinepro.net` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Needed >300,000** |
 
 *The complete list of 234,629 excluded domains is available in `excluded_domains_report.csv` for deeper analysis.*
 
