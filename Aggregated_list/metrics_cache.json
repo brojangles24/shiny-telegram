@@ -1,14 +1,20 @@
 {
+  "HAGEZI_ULTIMATE": {
+    "In_Priority_List": 186513,
+    "Unique_to_Source": 103794,
+    "Total_Fetched": 233027,
+    "Volatility": "+0.0%"
+  },
   "OISD_BIG": {
-    "In_Priority_List": 98839,
-    "Unique_to_Source": 109988,
+    "In_Priority_List": 98833,
+    "Unique_to_Source": 109989,
     "Total_Fetched": 214988,
     "Volatility": "+0.0%"
   },
-  "HAGEZI_ULTIMATE": {
-    "In_Priority_List": 186513,
-    "Unique_to_Source": 103795,
-    "Total_Fetched": 233027,
+  "ANUDEEP_ADSERVERS": {
+    "In_Priority_List": 7045,
+    "Unique_to_Source": 35261,
+    "Total_Fetched": 42347,
     "Volatility": "+0.0%"
   },
   "STEVENBLACK_HOSTS": {
@@ -18,9 +24,9 @@
     "Volatility": "+0.0%"
   },
   "ADGUARD_BASE": {
-    "In_Priority_List": 98739,
-    "Unique_to_Source": 47362,
-    "Total_Fetched": 119417,
+    "In_Priority_List": 98748,
+    "Unique_to_Source": 47375,
+    "Total_Fetched": 119433,
     "Volatility": "+0.0%"
   },
   "1HOSTS_LITE": {
@@ -33,12 +39,6 @@
     "In_Priority_List": 6488,
     "Unique_to_Source": 10,
     "Total_Fetched": 6540,
-    "Volatility": "+0.0%"
-  },
-  "ANUDEEP_ADSERVERS": {
-    "In_Priority_List": 7045,
-    "Unique_to_Source": 35261,
-    "Total_Fetched": 42347,
     "Volatility": "+0.0%"
   }
 }
