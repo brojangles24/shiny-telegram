@@ -17,16 +17,16 @@
     "Total_Fetched": 214727,
     "Volatility": "+0.0%"
   },
-  "STEVENBLACK_HOSTS": {
-    "In_Priority_List": 37550,
-    "Unique_to_Source": 56632,
-    "Total_Fetched": 97120,
-    "Volatility": "+0.0%"
-  },
   "HAGEZI_ULTIMATE": {
     "In_Priority_List": 186411,
     "Unique_to_Source": 103914,
     "Total_Fetched": 232940,
+    "Volatility": "+0.0%"
+  },
+  "STEVENBLACK_HOSTS": {
+    "In_Priority_List": 37550,
+    "Unique_to_Source": 56632,
+    "Total_Fetched": 97120,
     "Volatility": "+0.0%"
   },
   "ANUDEEP_ADSERVERS": {
