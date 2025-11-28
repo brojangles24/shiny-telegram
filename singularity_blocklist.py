@@ -2,10 +2,15 @@
 """
 🚀 Singularity DNS Blocklist Aggregator (v5.8.4 - Final Logger Fix)
 
-- **FIX:** Added missing .warning() method to the ConsoleLogger class to resolve 
-         the final AttributeError crash during archive cleanup.
-- All Advanced Metrics (Jaccard, Volatility, Churn) and Robustness features 
+- **FIX:** Added missing .warning() method to the ConsoleLogger class to resolve
+        the final AttributeError crash during archive cleanup.
+- All Advanced Metrics (Jaccard, Volatility, Churn) and Robustness features
   (Archive Limits) are confirmed to be functioning after the logger fix.
+  
+- **UPDATE (User Request):** Added args for custom TLD exclusion.
+  - `--block-tlds`: Add TLDs via command line.
+  - `--custom-tld-file`: Add TLDs from a local file.
+  - `--no-hagezi-tlds`: Disable fetching the default Hagezi TLD list.
 """
 import sys
 import csv
@@ -322,7 +327,7 @@ def write_output_files(
     """Writes all final output files in the specified format."""
     logger.info("💾 Writing final output files...")
     output_path.mkdir(exist_ok=True, parents=True)
-    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M%S')
 
     # 1. Priority List (TLD-filtered and capped)
     priority_file = output_path / PRIORITY_FILENAME
@@ -349,7 +354,7 @@ def write_output_files(
     # 4. Abused TLD Regex List
     regex_file = output_path / REGEX_TLD_FILENAME
     with open(regex_file, "w", encoding="utf-8") as f:
-        f.write(f"# Hagezi Abused TLDs Regex List\n# Generated: {now_str}\n# Total: {len(abused_tlds):,}\n")
+        f.write(f"# Hagezi Abused TLDs Regex List (and custom additions, if any)\n# Generated: {now_str}\n# Total: {len(abused_tlds):,}\n")
         f.writelines(f"\\.{t}$\n" for t in sorted(abused_tlds))
         
     # 5. Full Aggregated List (ALL scored domains, including TLD rejected)
@@ -495,28 +500,65 @@ def aggregate_and_score_domains(source_sets: Dict[str, Set[str]]) -> Tuple[Count
 
     return combined_counter, overlap_counter, domain_sources
 
+
+# --- MODIFIED: Function signature and TLD loading logic ---
 def filter_and_prioritize(
     combined_counter: Counter, logger: ConsoleLogger,
-    priority_cap: int 
+    priority_cap: int,
+    custom_tlds_cli: List[str],      # <-- ADDED
+    custom_tld_file: Optional[Path], # <-- ADDED
+    no_hagezi_tlds: bool             # <-- ADDED
 ) -> Tuple[Set[str], Set[str], int, List[str], Counter, List[Dict[str, Any]]]:
     """
     Filters domains by abusive TLDs for the priority list.
     Returns: 
     1. final_priority (TLD-filtered, capped list)
-    2. full_scored_list (ALL scored domains, including TLD-rejected)
-    3. excluded_domains_verbose (for verbose report)
+    2. abused_tlds (The final set of TLDs used for filtering)
+    3. excluded_count (How many domains were filtered by TLD)
+    4. full_scored_list (ALL scored domains, including TLD-rejected)
+    5. tld_exclusion_counter (A Counter of excluded TLDs)
+    6. excluded_domains_verbose (for verbose report)
     """
     
-    try:
-        tld_lines_req = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.4'})
-        tld_lines_req.raise_for_status()
-        tld_lines = tld_lines_req.text.splitlines()
-        abused_tlds = {l.strip().lower() for l in tld_lines if l.strip() and not l.startswith("#")}
-    except Exception as e:
-        logger.error(f"FATAL: Could not fetch Hagezi TLD list: {e}. Aborting TLD filter.")
-        abused_tlds = set() # Fail open, don't filter anything
+    abused_tlds: Set[str] = set()
 
-    logger.info(f"🚫 Excluding domains with {len(abused_tlds)} known abusive TLDs.")
+    # 1. --- Load Hagezi TLDs (if not disabled) ---
+    if not no_hagezi_tlds:
+        try:
+            logger.info(f"Fetching Hagezi Abused TLD list from: {HAGEZI_ABUSED_TLDS}")
+            tld_lines_req = requests.get(HAGEZI_ABUSED_TLDS, timeout=45, headers={'User-Agent': 'SingularityDNSBlocklistAggregator/5.8.4'})
+            tld_lines_req.raise_for_status()
+            tld_lines = tld_lines_req.text.splitlines()
+            hagezi_set = {l.strip().lower() for l in tld_lines if l.strip() and not l.startswith("#")}
+            abused_tlds.update(hagezi_set)
+            logger.info(f"Loaded {len(hagezi_set):,} TLDs from Hagezi.")
+        except Exception as e:
+            logger.error(f"WARNING: Could not fetch Hagezi TLD list: {e}. Continuing with custom TLDs if provided.")
+    else:
+        logger.info("Skipping Hagezi TLD list fetch as requested.")
+
+    # 2. --- Load Custom TLDs from File (if provided) ---
+    if custom_tld_file:
+        if custom_tld_file.exists():
+            try:
+                with open(custom_tld_file, 'r', encoding='utf-8') as f:
+                    file_tlds = {l.strip().lower().lstrip('.') for l in f if l.strip() and not l.startswith("#")}
+                abused_tlds.update(file_tlds)
+                logger.info(f"Loaded {len(file_tlds):,} TLDs from custom file: {custom_tld_file.name}")
+            except Exception as e:
+                logger.error(f"Failed to read custom TLD file {custom_tld_file.name}: {e}")
+        else:
+            logger.warning(f"Custom TLD file not found: {custom_tld_file}")
+    
+    # 3. --- Load Custom TLDs from CLI (if provided) ---
+    if custom_tlds_cli:
+        cli_tlds = {t.lower().lstrip('.') for t in custom_tlds_cli}
+        abused_tlds.update(cli_tlds)
+        logger.info(f"Loaded {len(cli_tlds):,} TLDs from command-line arguments.")
+
+    logger.info(f"🚫 Total unique TLDs for exclusion: {len(abused_tlds):,}")
+
+    # --- This point onward is the original logic, which is correct ---
     
     # 1. Create a list of ALL scored domains (domain, score) for the full report
     full_scored_list: List[Tuple[str, int]] = sorted(
@@ -556,7 +598,9 @@ def filter_and_prioritize(
     logger.info(f"💾 Priority list capped at {len(final_priority):,} domains.")
     
     # Return the full list including TLD rejected domains for the aggregated_full.txt file
+    # and the final set of TLDs used for filtering
     return final_priority, abused_tlds, excluded_count, [d for d, _ in full_scored_list], tld_exclusion_counter, excluded_domains_verbose
+# --- END MODIFIED FUNCTION ---
 
 
 # --- MODIFIED: calculate_source_metrics ---
@@ -579,21 +623,21 @@ def calculate_source_metrics(
             metrics[unique_source]["Unique_to_Source"] += 1
 
     for name, domains in all_domains_from_sources.items():
-          current_fetched = len(domains)
-          metrics[name]["Total_Fetched"] = current_fetched
-          
-          # --- VOLATILITY CALCULATION ---
-          old_fetched = old_source_metrics.get(name, {}).get("Total_Fetched", 0)
-          
-          if old_fetched > 0:
-              change_pct = ((current_fetched - old_fetched) / old_fetched) * 100
-              # Format as a string, which the report table expects
-              metrics[name]["Volatility"] = f"{change_pct:+.1f}%" 
-          elif current_fetched > 0:
-               metrics[name]["Volatility"] = "New"
-          else:
-               metrics[name]["Volatility"] = "N/A"
-          # --- END VOLATILITY ---
+            current_fetched = len(domains)
+            metrics[name]["Total_Fetched"] = current_fetched
+            
+            # --- VOLATILITY CALCULATION ---
+            old_fetched = old_source_metrics.get(name, {}).get("Total_Fetched", 0)
+            
+            if old_fetched > 0:
+                change_pct = ((current_fetched - old_fetched) / old_fetched) * 100
+                # Format as a string, which the report table expects
+                metrics[name]["Volatility"] = f"{change_pct:+.1f}%" 
+            elif current_fetched > 0:
+                metrics[name]["Volatility"] = "New"
+            else:
+                metrics[name]["Volatility"] = "N/A"
+            # --- END VOLATILITY ---
             
     final_metrics: Dict[str, Dict[str, Union[int, str]]] = {k: dict(v) for k, v in metrics.items()}
     logger.info("📈 Calculated Source Metrics (including Volatility).")
@@ -652,7 +696,7 @@ def calculate_similarity_matrix(
         matrix[name_b][name_a] = jaccard_index
     
     for name in source_names:
-         matrix[name][name] = 1.0  # A list is 100% similar to itself
+        matrix[name][name] = 1.0  # A list is 100% similar to itself
         
     return matrix
 
@@ -841,9 +885,9 @@ def generate_markdown_report(
             try:
                 # Value is already a string like "+1.5%"
                 change_pct = float(volatility_display.replace('%', ''))
-                if abs(change_pct) <= 5.0: color_style = "color:green;"      # Stable
-                elif change_pct >= 25.0: color_style = "color:orange;"   # Grew a lot
-                elif change_pct <= -25.0: color_style = "color:red;"     # Shrunk a lot
+                if abs(change_pct) <= 5.0: color_style = "color:green;"     # Stable
+                elif change_pct >= 25.0: color_style = "color:orange;"  # Grew a lot
+                elif change_pct <= -25.0: color_style = "color:red;"    # Shrunk a lot
             except ValueError: pass
         elif volatility_display == "New":
             color_style = "color:cyan;"
@@ -863,7 +907,7 @@ def generate_markdown_report(
     # --- ROBUSTNESS FIX: Changed to triple-quotes ---
     report.append("""
 
-[Image of a data heatmap for correlation]
+
 """)
     
     matrix_sources = sorted(jaccard_matrix.keys())
@@ -912,7 +956,10 @@ def generate_markdown_report(
     # --- ROBUSTNESS FIX: Changed to triple-quotes ---
     report.append("""
 
+
+
 [Image of a vertical bar chart]
+
 """)
     
     priority_tld_counter = Counter(extract_tld(d) for d in priority_set if extract_tld(d))
@@ -931,7 +978,10 @@ def generate_markdown_report(
     # --- ROBUSTNESS FIX: Changed to triple-quotes ---
     report.append("""
 
+
+
 [Image of a time series line graph]
+
 """)
     report.append(f"See `historical_trend_chart.png` and `score_distribution_chart.png`.")
     
@@ -957,8 +1007,45 @@ def main():
         help="The maximum size (MB) for the /archive folder. Oldest files are deleted. (default: 50)"
     )
     
+    # --- ADDED: Custom TLD Arguments ---
+    parser.add_argument(
+        "--block-tlds", nargs='+', default=[],
+        help="A space-separated list of custom TLDs to block (e.g., --block-tlds xyz ru cn). Merged with other TLD lists by default."
+    )
+    parser.add_argument(
+        "--custom-tld-file", type=Path, default=None,
+        help="Path to a custom text file of TLDs to exclude (one per line)."
+    )
+    parser.add_argument(
+        "--no-hagezi-tlds", action="store_true",
+        help="Do not fetch the Hagezi abused TLD list. Use only --block-tlds or --custom-tld-file."
+    )
+    # --- END ADDED ---
+    
     parser.add_argument("--test", action="store_true", help="Run internal integrity tests and exit.")
     args = parser.parse_args()
+    
+    # --- ⬇️ EDIT YOUR CUSTOM TLDS HERE ⬇️ ---
+    
+    # Define your list of TLDs to block
+    my_custom_tlds = ["xyz", "ru", "cn", "top", "click", "xyz", "pro", "info", "br"] 
+
+    # --- CHOOSE ONE OPTION ---
+
+    # Option 1: (ACTIVE) ADD your TLDs to the Hagezi list
+    # This MERGES your list with the default Hagezi list.
+    args.block_tlds.extend(my_custom_tlds)
+
+
+    # Option 2: (INACTIVE) REPLACE the Hagezi list with ONLY your list
+    # This IGNORES Hagezi and uses ONLY your TLDs.
+    # To use this, comment out "args.block_tlds.extend..." above
+    # and uncomment the two lines below:
+    
+    # args.no_hagezi_tlds = True
+    # args.block_tlds = my_custom_tlds
+    
+    # --- ⬆️ END OF CUSTOM TLD SECTION ⬆️ ---
     
     # --- Internal Test Suite (No change) ---
     if args.test:
@@ -1011,9 +1098,12 @@ def main():
         jaccard_matrix = calculate_similarity_matrix(source_sets, logger)
         
         # 3. Filter & Prioritize
+        # --- MODIFIED: Pass new TLD arguments ---
         priority_set, abused_tlds, excluded_count, full_list, tld_exclusion_counter, excluded_domains_verbose = filter_and_prioritize(
-            combined_counter, logger, priority_cap_val
+            combined_counter, logger, priority_cap_val,
+            args.block_tlds, args.custom_tld_file, args.no_hagezi_tlds
         )
+        # --- END MODIFIED ---
 
         # 4. History Tracking & Metrics 
         priority_count = len(priority_set)
