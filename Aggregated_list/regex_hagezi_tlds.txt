@@ -1,6 +1,6 @@
 # Hagezi Abused TLDs Regex List (and custom additions, if any)
-# Generated: 2025-11-28 04:2246
-# Total: 440
+# Generated: 2025-11-28 04:2733
+# Total: 434
 \.actor$
 \.africa$
 \.agency$
@@ -27,7 +27,6 @@
 \.boo$
 \.boston$
 \.boutique$
-\.br$
 \.builders$
 \.business$
 \.buzz$
@@ -53,7 +52,6 @@
 \.clothing$
 \.club$
 \.cm$
-\.cn$
 \.college$
 \.computer$
 \.consulting$
@@ -131,7 +129,6 @@
 \.house$
 \.how$
 \.icu$
-\.info$
 \.ink$
 \.international$
 \.irish$
@@ -196,7 +193,6 @@
 \.plus$
 \.poker$
 \.post$
-\.pro$
 \.prof$
 \.promo$
 \.pub$
@@ -219,7 +215,6 @@
 \.rich$
 \.rip$
 \.rodeo$
-\.ru$
 \.ryukyu$
 \.sa.com$
 \.sale$
@@ -435,7 +430,6 @@
 \.xn--ygbi2ammx$
 \.xn--zfr164b$
 \.xx.kg$
-\.xyz$
 \.yachts$
 \.yoga$
 \.you$
