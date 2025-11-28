@@ -1028,7 +1028,7 @@ def main():
     # --- ⬇️ EDIT YOUR CUSTOM TLDS HERE ⬇️ ---
     
     # Define your list of TLDs to block
-    my_custom_tlds = ["xyz", "ru", "cn", "top", "click", "xyz", "pro", "info", "br"] 
+    my_custom_tlds = [] 
 
     # --- CHOOSE ONE OPTION ---
 
