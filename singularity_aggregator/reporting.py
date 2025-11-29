@@ -66,7 +66,7 @@ def generate_history_plot(history: List[Dict[str, str]], logger: ConsoleLogger):
         return
 
     try:
-        dates = [datetime.strptime(row["Date"], "%Y-%m-%d") for row in history]
+        dates = [datetime.strptime(row["Date"], "%Y-m-%d") for row in history]
         totals = [int(row["Total_Unique_Domains"]) for row in history]
         
         fig = go.Figure()
@@ -89,6 +89,57 @@ def generate_history_plot(history: List[Dict[str, str]], logger: ConsoleLogger):
         logger.error(f"Failed to generate history plot: {e}")
         logger.error("Plotly static image export may require 'kaleido'. Try: pip install kaleido")
 
+def generate_jaccard_heatmap(matrix: Dict[str, Dict[str, float]], logger: ConsoleLogger):
+    """Generates a static PNG heatmap of the Jaccard similarity matrix."""
+    image_path = config.OUTPUT_DIR / "jaccard_heatmap.png"
+    logger.info(f"🧬 Generating Jaccard similarity heatmap at {image_path.name}")
+    
+    # Heatmaps need data in a specific, sorted order
+    labels = sorted(matrix.keys())
+    z_data = [] # This will be the 2D array of values (0.0 to 1.0)
+    z_text = [] # This will be the text (percentages) in the cells
+
+    for label_x in labels:
+        row_data = []
+        row_text = []
+        for label_y in labels:
+            value = matrix.get(label_x, {}).get(label_y, 0.0)
+            row_data.append(value)
+            row_text.append(f"{value * 100:.0f}%")
+        z_data.append(row_data)
+        z_text.append(row_text)
+    
+    fig = go.Figure(data=go.Heatmap(
+        z=z_data,
+        x=labels,
+        y=labels,
+        text=z_text,
+        texttemplate="%{text}", # Display the text
+        textfont={"size":10},
+        colorscale='Cividis_r', # 'r' for reversed: Dark blue (low) to yellow (high)
+        zmin=0,
+        zmax=1,
+        hoverongaps=False
+    ))
+
+    fig.update_layout(
+        title='List Similarity Matrix (Jaccard Index)',
+        template="plotly_dark",
+        xaxis_nticks=len(labels),
+        yaxis_nticks=len(labels),
+        width=800,
+        height=800,
+        xaxis_showgrid=False,
+        yaxis_showgrid=False,
+        xaxis_tickangle=-45 # Angle the bottom labels
+    )
+    
+    try:
+        pio.write_image(fig, str(image_path), scale=1.5)
+    except Exception as e:
+        logger.error(f"Failed to write Jaccard heatmap image: {e}")
+        logger.error("Plotly static image export may require 'kaleido'.")
+
 # --- Markdown Reporting ---
 
 def generate_markdown_report(
@@ -103,7 +154,7 @@ def generate_markdown_report(
     priority_set: Set[str],
     priority_set_metrics: Dict[str, Any],
     new_domain_metrics: Dict[str, Any],
-    priority_filename: str # <-- NEW
+    priority_filename: str
 ):
     """
     Creates a detailed, aesthetic Markdown report with enhanced metrics.
@@ -132,6 +183,7 @@ def generate_markdown_report(
         report.append("\n## 🗑️ Top Excluded Domains for Audit (High Score / TLD Rejection)")
         tld_excluded = [d for d in excluded_domains_verbose if d['status'] == 'TLD EXCLUDED']
         score_excluded = [d for d in excluded_domains_verbose if d['status'] == 'SCORE CUTOFF']
+        cap_excluded = [d for d in excluded_domains_verbose if d['status'] == 'CAP CUTOFF']
         samples_to_show = []
         
         tld_excluded.sort(key=lambda x: x['score'], reverse=True)
@@ -146,6 +198,13 @@ def generate_markdown_report(
                 samples_to_show.append({
                 'domain': d['domain'], 'score': d['score'],
                 'reason': f"Score Cutoff: **{d['reason'].split('Score ')[1]}**"
+            })
+            
+        cap_excluded.sort(key=lambda x: x['score'], reverse=True)
+        for d in cap_excluded[:5]:
+                samples_to_show.append({
+                'domain': d['domain'], 'score': d['score'],
+                'reason': f"Cap Cutoff: **{d['reason'].split(' top ')[1]} list**"
             })
         
         samples_to_show.sort(key=lambda x: x['score'], reverse=True)
@@ -186,8 +245,9 @@ def generate_markdown_report(
         report.append("> *No previous archive file found. Change tracking will begin on the next run.*")
     
     report.append("\n## 🌐 Source Performance & Health Check")
-    report.append(r"| Source | Category | Weight | Total Fetched | In Priority List | % List In Priority | Volatility ($\pm \%$) | Color |")
-    report.append("| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |")
+    # --- NEW: Added "FP Risk" and "Coverage" columns ---
+    report.append(r"| Source | Category | Weight | FP Risk | Coverage | Total Fetched | % In Priority | Volatility ($\pm \%$) | Color |")
+    report.append("| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |")
     
     # Use the (potentially modified) list of sources from config
     sorted_sources = sorted(config.BLOCKLIST_SOURCES.keys(), key=lambda n: config.SOURCE_WEIGHTS.get(n, 0), reverse=True)
@@ -195,10 +255,32 @@ def generate_markdown_report(
     for name in sorted_sources:
         weight = config.SOURCE_WEIGHTS.get(name, 1)
         category = config.SOURCE_CATEGORIES.get(name, "Other")
+        
+        # --- NEW RATING LOGIC ---
         fetched_count = source_metrics.get(name, {}).get("Total_Fetched", 0)
+        unique_count = source_metrics.get(name, {}).get("Unique_to_Source", 0)
         in_priority = source_metrics.get(name, {}).get("In_Priority_List", 0)
         volatility_raw = source_metrics.get(name, {}).get("Volatility", "N/A")
         
+        uniqueness_ratio = (unique_count / fetched_count) if fetched_count > 0 else 0
+
+        # 1. FP Risk Rating (False Positives)
+        if uniqueness_ratio > 0.4:
+            fp_risk_rating = "High 🟥"
+        elif uniqueness_ratio > 0.15:
+            fp_risk_rating = "Medium 🟨"
+        else:
+            fp_risk_rating = "Low 🟩"
+            
+        # 2. Coverage Rating (Missed Domains)
+        if "Aggregated" in category:
+            coverage_rating = "Broad 🟩"
+        elif "Specialized" in category:
+            coverage_rating = "Specialized 🟦" # Designed to "miss" other domains
+        else:
+            coverage_rating = "Medium 🟨"
+        # --- END NEW RATING LOGIC ---
+
         percent_in_priority = f"{((in_priority / fetched_count) * 100):.2f}%" if fetched_count > 0 else "0.00%"
         
         color_style = ""
@@ -216,33 +298,21 @@ def generate_markdown_report(
 
         source_color = config.SOURCE_COLORS.get(name, "black")
         
+        # --- NEW: Appending the new ratings to the row ---
         report.append(
-            f"| **{name}** | {category} | {weight} | {fetched_count:,} | {in_priority:,} | **{percent_in_priority}** | "
-            f"<span style='{color_style}'>`{volatility_display}`</span> | <span style='color:{source_color};'>███</span> |"
+            f"| **{name}** | {category} | {weight} | **{fp_risk_rating}** | **{coverage_rating}** | {fetched_count:,} | "
+            f"**{percent_in_priority}** | <span style='{color_style}'>`{volatility_display}`</span> | <span style='color:{source_color};'>███</span> |"
         )
     report.append("\n---")
     
+    # --- THIS IS THE NEW, REPLACED SECTION ---
     report.append("\n## 🖇️ List Similarity Matrix (Jaccard Index)")
-    report.append("Measures the overlap between lists (Intersection / Union). A high value (e.g., 0.85) means the lists are very redundant.")
-    report.append("\n\n")
+    report.append("Measures the overlap between lists (Intersection / Union).")
+    report.append("Dark blue = highly unique. Bright yellow = highly redundant.")
+    report.append("\n\n\n\n")
+    # --- END OF REPLACED SECTION ---
     
-    matrix_sources = sorted(jaccard_matrix.keys())
-    header = "| Source |" + " | ".join([f"**{name[:6]}...**" for name in matrix_sources]) + " |"
-    divider = "| :--- |" + " :---: |" * len(matrix_sources)
-    report.append(header)
-    report.append(divider)
-    
-    for name_a in matrix_sources:
-        row = f"| **{name_a}** |"
-        for name_b in matrix_sources:
-            value = jaccard_matrix.get(name_a, {}).get(name_b, 0.0)
-            if value == 1.0: row += " `1.00` |"
-            elif value > 0.75: row += f" <span style='color:red;'>**{value:.2f}**</span> |"
-            elif value > 0.5: row += f" <span style='color:orange;'>{value:.2f}</span> |"
-            else: row += f" {value:.2f} |"
-        report.append(row)
     report.append("\n---")
-    
     report.append("\n## 🤝 Domain Overlap Breakdown")
     report.append("Distribution of domains across multiple sources (as a percentage of the Total Scored Domains).")
     
@@ -264,10 +334,10 @@ def generate_markdown_report(
 
     # --- DPA Sub-Section 1: Priority List Composition ---
     report.append("\n### 1. Final Priority List Composition")
-    report.append(f"Analysis of all domains in the final `{priority_filename}` list.") # <-- MODIFIED
+    report.append(f"Analysis of all domains in the final `{priority_filename}` list.")
     
     # DPA: TLDs
-    report.append(f"\n**Top 15 TLDs in `{priority_filename}`:**") # <-- MODIFIED
+    report.append(f"\n**Top 15 TLDs in `{priority_filename}`:**")
     priority_tld_counter = Counter(extract_tld(d) for d in priority_set if extract_tld(d))
     report.append("| Rank | TLD | Domain Count | % of Priority List |")
     report.append("| :---: | :--- | :---: | :---: |")
@@ -310,7 +380,7 @@ def generate_markdown_report(
     
     report.append("\n## 📈 Interactive Visualization")
     report.append("\n\n\n\n")
-    report.append(f"See `historical_trend_chart.png` and `score_distribution_chart.png`.")
+    report.append(f"See `historical_trend_chart.png`, `score_distribution_chart.png`, and `jaccard_heatmap.png`.")
     
     # Write the report
     try:
