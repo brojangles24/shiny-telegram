@@ -29,7 +29,7 @@ from .file_handler import (
 from .fetcher import fetch_and_process_sources_async
 from .reporting import (
     generate_markdown_report, generate_static_score_histogram, 
-    generate_history_plot
+    generate_history_plot, generate_jaccard_heatmap # <-- ADDED HEATMAP
 )
 # --- Phase 1 DPA Imports ---
 from .utils import calculate_entropy, get_ngrams, get_domain_depth
@@ -59,7 +59,7 @@ def filter_and_prioritize(
     combined_counter: Counter, logger: ConsoleLogger,
     min_confidence_score: int,
     use_tld_exclusion: bool,
-    priority_cap: Optional[int], # <-- NEW: Optional cap
+    priority_cap: Optional[int], # <-- Optional cap
     args_block_tlds: List[str],
     args_custom_tld_file: Optional[Path],
     args_no_hagezi_tlds: bool
@@ -155,7 +155,7 @@ def filter_and_prioritize(
         logger.info(f"🔥 Excluded {excluded_count_tld:,} domains by TLD filter.")
     logger.info(f"🔥 Excluded {excluded_count_score:,} domains by Score filter (Min: {min_confidence_score}).")
     
-    # --- NEW: 4. Apply optional priority cap ---
+    # --- 4. Apply optional priority cap ---
     if priority_cap is not None:
         final_priority_set = {d for d, _ in priority_candidates[:priority_cap]}
         logger.info(f"💾 Priority list capped at {len(final_priority_set):,} domains (Cap: {priority_cap:,}).")
@@ -178,15 +178,16 @@ def filter_and_prioritize(
     )
 
 # --- Metrics Calculation ---
-# (No changes to: calculate_source_metrics, track_priority_changes,
-#  calculate_similarity_matrix, analyze_domain_properties)
+
 def calculate_source_metrics(
     priority_set: Set[str], full_list: List[str], overlap_counter: Counter, 
     domain_sources: Dict[str, Set[str]], all_domains_from_sources: Dict[str, Set[str]], 
     logger: ConsoleLogger,
     old_source_metrics: Dict[str, Any]
 ) -> Dict[str, Dict[str, Union[int, str]]]:
+    """Calculates contribution and uniqueness metrics per source."""
     metrics = defaultdict(lambda: defaultdict(int))
+    
     for domain in full_list:
         sources = domain_sources[domain]
         if domain in priority_set:
@@ -194,10 +195,12 @@ def calculate_source_metrics(
         if overlap_counter[domain] == 1:
             unique_source = list(sources)[0]
             metrics[unique_source]["Unique_to_Source"] += 1
+
     for name, domains in all_domains_from_sources.items():
             current_fetched = len(domains)
             metrics[name]["Total_Fetched"] = current_fetched
             old_fetched = old_source_metrics.get(name, {}).get("Total_Fetched", 0)
+            
             if old_fetched > 0:
                 change_pct = ((current_fetched - old_fetched) / old_fetched) * 100
                 metrics[name]["Volatility"] = f"{change_pct:+.1f}%" 
@@ -205,6 +208,7 @@ def calculate_source_metrics(
                 metrics[name]["Volatility"] = "New"
             else:
                 metrics[name]["Volatility"] = "N/A"
+            
     final_metrics: Dict[str, Dict[str, Union[int, str]]] = {k: dict(v) for k, v in metrics.items()}
     logger.info("📈 Calculated Source Metrics (including Volatility).")
     return final_metrics
@@ -214,14 +218,18 @@ def track_priority_changes(
     old_priority_set: Set[str],
     logger: ConsoleLogger
 ) -> Dict[str, List[Dict[str, Any]]]:
+    """Compares the new priority set against the cached old set."""
     if not old_priority_set:
         logger.warning("🚫 No previous priority list found. Reporting all domains as 'Added'.")
         added = [{'domain': d, 'novelty': 'Fresh'} for d in current_priority_set]
         return {"added": added, "removed": [], "remained": []}
+
     added_domains = current_priority_set - old_priority_set
     removed_domains = old_priority_set - current_priority_set
     remained_domains = current_priority_set & old_priority_set
+    
     logger.info(f"🔄 Priority Change: {len(added_domains):,}+ added, {len(removed_domains):,}- removed, {len(remained_domains):,} remained.")
+    
     change_report = {
         "added": [{'domain': d, 'novelty': 'Fresh'} for d in added_domains],
         "removed": [{'domain': d} for d in removed_domains],
@@ -232,32 +240,49 @@ def track_priority_changes(
 def calculate_similarity_matrix(
     source_sets: Dict[str, Set[str]], logger: ConsoleLogger
 ) -> Dict[str, Dict[str, float]]:
+    """Calculates the Jaccard Index for every pair of blocklists."""
     logger.info("🖇️  Calculating Jaccard similarity matrix...")
     matrix = defaultdict(dict)
     source_names = sorted(source_sets.keys())
+
     for name_a, name_b in combinations(source_names, 2):
         set_a = source_sets[name_a]
         set_b = source_sets[name_b]
+        
         intersection = len(set_a & set_b)
         union = len(set_a | set_b)
         jaccard_index = (intersection / union) if union > 0 else 0.0
+            
         matrix[name_a][name_b] = jaccard_index
         matrix[name_b][name_a] = jaccard_index
+    
     for name in source_names:
         matrix[name][name] = 1.0
+        
     return matrix
 
 def analyze_domain_properties(domains: Set[str]) -> Dict[str, Any]:
+    """
+    Performs Domain Property Analysis (DPA) on a set of domains.
+    Returns a dictionary of calculated metrics.
+    """
     if not domains:
-        return {"avg_entropy": 0, "top_trigrams": [], "depth_counts": Counter()}
+        return {
+            "avg_entropy": 0,
+            "top_trigrams": [],
+            "depth_counts": Counter()
+        }
+
     total_entropy = 0
     trigram_counter = Counter()
     depth_counter = Counter()
+
     for domain in domains:
         total_entropy += calculate_entropy(domain)
         trigram_counter.update(get_ngrams(domain, 3))
         depth = get_domain_depth(domain)
         depth_counter[depth] += 1
+
     return {
         "avg_entropy": total_entropy / len(domains),
         "top_trigrams": trigram_counter.most_common(10),
@@ -277,7 +302,6 @@ def main():
     )
     parser.add_argument("-d", "--debug", action="store_true", help="Enable DEBUG logging")
     
-    # --- MODIFIED: Aggressiveness ---
     parser.add_argument(
         "-a", "--aggressiveness", type=int, default=config.AGGRESSIVENESS_DEFAULT,
         choices=range(1, 12), metavar="[1-11]", # <-- ALLOWS 11
@@ -287,7 +311,6 @@ def main():
         "--include-tlds", action="store_true",
         help="Bypass TLD filtering (more aggressive). Overrides 'use_tld_exclusion = true' in config."
     )
-    # --- END OF MODIFICATION ---
     
     parser.add_argument(
         "-w", "--max-workers", type=int, default=config.MAX_WORKERS_DEFAULT, 
@@ -332,7 +355,7 @@ def main():
     
     config.OUTPUT_DIR.mkdir(exist_ok=True)
     
-    # --- NEW: Determine Policy from Config and Args ---
+    # --- Determine Policy from Config and Args ---
     aggressiveness_level = args.aggressiveness
     
     # 1. Determine dynamic sources
@@ -382,10 +405,9 @@ def main():
         final_priority_filename = f"{policy_label}_{config.PRIORITY_FILENAME}"
     
     logger.info(f"🛡️ Policy: Output filename will be {final_priority_filename}")
-    # --- END OF NEW BLOCK ---
     
     start = datetime.now()
-    logger.info("--- 🚀 Starting Singularity DNS Aggregation (v5.8.4 - Modular) ---")
+    logger.info("--- 🚀 Starting Singularity DNS Blocklist Aggregation (v5.8.4 - Modular) ---")
     
     if args.cleanup_cache:
         cleanup_old_files(logger)
@@ -406,6 +428,9 @@ def main():
         
         # 2.5 Calculate Similarity
         jaccard_matrix = calculate_similarity_matrix(source_sets, logger)
+        
+        # 2.6 Generate Heatmap Image
+        generate_jaccard_heatmap(jaccard_matrix, logger)
         
         # 3. Filter & Prioritize
         priority_set, abused_tlds, excluded_count_tld, full_list, tld_exclusion_counter, excluded_domains_verbose = filter_and_prioritize(
@@ -450,7 +475,7 @@ def main():
             priority_count, change, total_unfiltered, excluded_count_tld, full_list, combined_counter,
             overlap_counter, source_metrics, history, logger, domain_sources, change_report, 
             tld_exclusion_counter, 
-            report_policy_str,      # <-- MODIFIED
+            report_policy_str,
             excluded_domains_verbose,
             jaccard_matrix,
             priority_set,
@@ -462,7 +487,7 @@ def main():
         # 7. File Writing
         write_output_files(
             priority_set, abused_tlds, full_list, logger, 
-            report_policy_str,      # <-- MODIFIED (used for header)
+            report_policy_str,
             excluded_domains_verbose, args.verbose_report, args.output_format,
             final_priority_filename
         )
@@ -473,7 +498,7 @@ def main():
         # 9. Cleanup Archive by Size
         logger.info("Checking archive folder size limit...")
         cleanup_archive_by_size(args.archive_limit_mb, logger)
-
+        
     except Exception as e:
         logger.error(f"FATAL ERROR during execution: {e.__class__.__name__}: {e}")
         if args.debug:
