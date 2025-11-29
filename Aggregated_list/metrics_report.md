@@ -1,11 +1,11 @@
 # 🛡️ Singularity DNS Blocklist Dashboard (v5.8.4)
-*Generated: 2025-11-29 05:01:49*
+*Generated: 2025-11-29 05:09:06*
 
 ## 📜 Aggregation Summary
 | Metric | Count | Insight |
 | :--- | :---: | :--- |
 | **Total Scored Domains** | **531,517** | Size of the list including TLD rejected entries. |
-| Change vs. Last Run | `+15` ⬆️ | Trend in the total unique domain pool. |
+| Change vs. Last Run | `+0` ➡️ | Trend in the total unique domain pool. |
 | Priority List Size | 3,068 | Domains with **Min Confidence: 70% (Score >= 24)** (Max: 33). |
 | High Consensus (Score 11+) | 133,278 | Domains backed by strong weighted evidence. |
 | TLD Filter Exclusions | 58 | Domains rejected by the abusive TLD list. |
@@ -16,16 +16,16 @@
 These are the highest-scoring domains that failed to make the final list:
 | Domain | Weighted Score | Exclusion Reason |
 | :--- | :---: | :--- |
-| `stats.ozwebsites.biz` | <span style='color:red;'>**30**</span> | TLD Rejected: **.biz is marked as abusive.** |
 | `zlp6s.pw` | <span style='color:red;'>**30**</span> | TLD Rejected: **.pw is marked as abusive.** |
+| `stats.ozwebsites.biz` | <span style='color:red;'>**30**</span> | TLD Rejected: **.biz is marked as abusive.** |
 | `adop.cc` | <span style='color:red;'>**29**</span> | TLD Rejected: **.cc is marked as abusive.** |
 | `optimix.asia` | <span style='color:red;'>**29**</span> | TLD Rejected: **.asia is marked as abusive.** |
-| `ad.weplayer.cc` | <span style='color:red;'>**29**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `souseuncurst.shop` | <span style='color:orange;'>**23**</span> | Score Cutoff: **23 is below minimum confidence 24.** |
-| `linkworth.com` | <span style='color:orange;'>**23**</span> | Score Cutoff: **23 is below minimum confidence 24.** |
-| `szgoetmggljs.com` | <span style='color:orange;'>**23**</span> | Score Cutoff: **23 is below minimum confidence 24.** |
-| `regal-high.com` | <span style='color:orange;'>**23**</span> | Score Cutoff: **23 is below minimum confidence 24.** |
-| `largelydisplace.com` | <span style='color:orange;'>**23**</span> | Score Cutoff: **23 is below minimum confidence 24.** |
+| `crosspromotion.weplayer.cc` | <span style='color:red;'>**29**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `setka.media` | <span style='color:orange;'>**23**</span> | Score Cutoff: **23 is below minimum confidence 24.** |
+| `acceptableredheadcaviar.com` | <span style='color:orange;'>**23**</span> | Score Cutoff: **23 is below minimum confidence 24.** |
+| `wary-corner.com` | <span style='color:orange;'>**23**</span> | Score Cutoff: **23 is below minimum confidence 24.** |
+| `pllsadrp.net` | <span style='color:orange;'>**23**</span> | Score Cutoff: **23 is below minimum confidence 24.** |
+| `vekmygssmfyov.online` | <span style='color:orange;'>**23**</span> | Score Cutoff: **23 is below minimum confidence 24.** |
 
 *The complete list of 528,449 excluded domains is in `excluded_domains_report.csv`.*
 
@@ -43,8 +43,8 @@ Domains with these TLDs were excluded from the priority list.
 | 6 | **.online** | 3 |
 | 7 | **.work** | 1 |
 | 8 | **.support** | 1 |
-| 9 | **.delivery** | 1 |
-| 10 | **.vip** | 1 |
+| 9 | **.life** | 1 |
+| 10 | **.space** | 1 |
 
 ---
 
@@ -52,7 +52,7 @@ Domains with these TLDs were excluded from the priority list.
 | Change Type | Domain Count | Novelty Breakdown |
 | :--- | :---: | :--- |
 | **Domains Added** | 0 | **0 Fresh** ✨ |
-| **Domains Removed** | 50,569 | |
+| **Domains Removed** | 0 | |
 | **Domains Remained** | 3,068 | |
 
 ## 🌐 Source Performance & Health Check
@@ -109,14 +109,14 @@ Analysis of all domains in the final `tiny_priority_list.txt` list.
 | 5 | **.io** | 51 | 1.66% |
 | 6 | **.me** | 39 | 1.27% |
 | 7 | **.org** | 33 | 1.08% |
-| 8 | **.ru** | 31 | 1.01% |
-| 9 | **.cn** | 31 | 1.01% |
+| 8 | **.cn** | 31 | 1.01% |
+| 9 | **.ru** | 31 | 1.01% |
 | 10 | **.de** | 28 | 0.91% |
 | 11 | **.uk** | 17 | 0.55% |
 | 12 | **.tv** | 16 | 0.52% |
 | 13 | **.pl** | 12 | 0.39% |
-| 14 | **.ca** | 9 | 0.29% |
-| 15 | **.xyz** | 9 | 0.29% |
+| 14 | **.xyz** | 9 | 0.29% |
+| 15 | **.ca** | 9 | 0.29% |
 
 **Domain Properties:**
 | Property | Value | Insight |
