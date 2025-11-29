@@ -20,16 +20,16 @@ use_tld_exclusion = true
 [policy_score_map]
 # Maps aggressiveness level (1-10) to the minimum weighted score
 # required for a domain to make the priority list.
-1 = 15
-2 = 14
-3 = 13
-4 = 12
-5 = 10 # Balanced
-6 = 8
-7 = 6  # Broad
-8 = 5
-9 = 4
-10 = 3 # Maximal
+1 = 14
+2 = 12
+3 = 10
+4 = 8
+5 = 6 # Balanced
+6 = 5
+7 = 4  # Broad
+8 = 3
+9 = 2
+10 = 1 # Maximal
 
 [policy_label_map]
 # Human-readable labels for aggressiveness levels
@@ -97,8 +97,8 @@ consensus_threshold = 6
 [scoring.weights]
 # Both Lite and Xtra are defined. The script will pick one.
 HAGEZI_ULTIMATE = 4
-"1HOSTS_LITE" = 3
-"1HOSTS_XTRA" = 3 # New
+1HOSTS_LITE = 3
+1HOSTS_XTRA = 1 # New
 OISD_BIG = 2
 ANUDEEP_ADSERVERS = 2
 ADAWAY_HOSTS = 2
@@ -109,8 +109,8 @@ ADGUARD_BASE = 3
 # The blocklist sources to aggregate
 HAGEZI_ULTIMATE = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/ultimate-onlydomains.txt"
 OISD_BIG = "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_big.txt"
-"1HOSTS_LITE" = "https://raw.githubusercontent.com/badmojr/1Hosts/refs/heads/master/Lite/domains.wildcards"
-"1HOSTS_XTRA" = "https://raw.githubusercontent.com/badmojr/1Hosts/master/Xtra/domains.wildcards" # New
+1HOSTS_LITE = "https://raw.githubusercontent.com/badmojr/1Hosts/refs/heads/master/Lite/domains.wildcards"
+1HOSTS_XTRA = "https://raw.githubusercontent.com/badmojr/1Hosts/master/Xtra/domains.wildcards" # New
 STEVENBLACK_HOSTS = "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
 ANUDEEP_ADSERVERS = "https://raw.githubusercontent.com/anudeepND/blacklist/master/adservers.txt"
 ADAWAY_HOSTS = "https://adaway.org/hosts.txt"
