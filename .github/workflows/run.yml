@@ -44,7 +44,7 @@ jobs:
         # (CHANGED) Executes the new 'main.py' entry point.
         # The flags (-p, -w, -v, -f) are still passed to argparse
         # in your processor.py module.
-        run: python main.py -w 16 -v -f hosts
+        run: python main.py -w 16 -v -f raw
 
       - name: Commit and Push Generated Files
         # This action automatically detects, stages, and commits all files
