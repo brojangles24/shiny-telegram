@@ -114,3 +114,36 @@ def track_history(
     except Exception as e: logger.error(f"Failed to write history file: {e}")
 
     return change, history
+
+def process_domain(line: str) -> Optional[str]:
+    """
+    Cleans a line from a blocklist file, handles filter syntax,
+    and performs Punycode normalization and validation.
+    """
+    if not line: return None
+    line = line.strip().lower()
+    if line.startswith(("#", "!", "/")): return None
+    if line.startswith("@@"): return None
+
+    domain = line
+    parts = line.split()
+    if len(parts) >= 2 and parts[0] in ("0.0.0.0", "127.0.0.1", "::"): domain = parts[1]
+
+    for char in ['||', '^', '$', '/', '#', '@', '&', '%', '?', '~', '|']:
+        domain = domain.replace(char, ' ').strip()
+
+    domain_candidate = domain.split()[0] if domain else None
+    if not domain_candidate: return None
+    domain_candidate = domain_candidate.lstrip("*.").lstrip(".")
+
+    if domain_candidate in ("localhost", "localhost.localdomain", "::1", "255.255.255.255", "wpad"): return None
+    if config.IPV4_REGEX.match(domain_candidate): return None
+
+    try:
+        ascii_domain = idna.encode(domain_candidate).decode('ascii')
+    except idna.IDNAError:
+        return None
+
+    if not config.DOMAIN_REGEX.match(ascii_domain): return None
+
+    return ascii_domain
