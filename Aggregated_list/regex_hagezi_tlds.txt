@@ -1,5 +1,5 @@
 # Hagezi Abused TLDs Regex List (and custom additions, if any)
-# Generated: 2025-11-29 06:3245
+# Generated: 2025-11-29 07:2113
 # Total: 434
 \.actor$
 \.africa$
