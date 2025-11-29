@@ -1,7 +1,7 @@
 """
 Core processing logic and main application entry point.
 - aggregate_and_score_domains: Combines lists and applies weights.
-- filter_and_prioritize: Applies TLD blocking and score cutoff.
+- filter_and_prioritize: Applies TLD blocking, score cutoff, and (optional) cap.
 - calculate...: All metrics functions (Jaccard, volatility, etc.)
 - main: The main function that orchestrates the entire pipeline.
 """
@@ -57,14 +57,15 @@ def aggregate_and_score_domains(
 
 def filter_and_prioritize(
     combined_counter: Counter, logger: ConsoleLogger,
-    min_confidence_score: int,  # <-- Replaces priority_cap
-    use_tld_exclusion: bool,    # <-- Master switch
+    min_confidence_score: int,
+    use_tld_exclusion: bool,
+    priority_cap: Optional[int], # <-- NEW: Optional cap
     args_block_tlds: List[str],
     args_custom_tld_file: Optional[Path],
     args_no_hagezi_tlds: bool
 ) -> Tuple[Set[str], Set[str], int, List[str], Counter, List[Dict[str, Any]]]:
     """
-    Filters domains by minimum confidence score and (if enabled) abusive TLDs.
+    Filters domains by score, TLDs (if enabled), and an optional final cap.
     """
     abused_tlds: Set[str] = set()
 
@@ -118,7 +119,7 @@ def filter_and_prioritize(
         combined_counter.items(), key=lambda x: x[1], reverse=True
     )
     
-    final_priority_set: Set[str] = set()
+    priority_candidates: List[Tuple[str, int]] = [] # Domains that pass score/TLD
     excluded_count_tld = 0
     excluded_count_score = 0
     tld_exclusion_counter = Counter()
@@ -147,14 +148,29 @@ def filter_and_prioritize(
                 })
                 continue # Skip to next domain
         
-        # 3. If it passed all filters, add it to the final set
-        final_priority_set.add(domain)
+        # 3. If it passed all filters, add it to the candidate list
+        priority_candidates.append((domain, weight))
             
     if use_tld_exclusion:
         logger.info(f"🔥 Excluded {excluded_count_tld:,} domains by TLD filter.")
     logger.info(f"🔥 Excluded {excluded_count_score:,} domains by Score filter (Min: {min_confidence_score}).")
-    logger.info(f"💾 Final priority list size: {len(final_priority_set):,} domains.")
     
+    # --- NEW: 4. Apply optional priority cap ---
+    if priority_cap is not None:
+        final_priority_set = {d for d, _ in priority_candidates[:priority_cap]}
+        logger.info(f"💾 Priority list capped at {len(final_priority_set):,} domains (Cap: {priority_cap:,}).")
+
+        # Log domains that passed filters but failed cap
+        for domain, score in priority_candidates[priority_cap:]:
+            excluded_domains_verbose.append({
+                'domain': domain, 'score': score, 'status': 'CAP CUTOFF',
+                'reason': f'Scored {score} but did not make the top {priority_cap:,} list.'
+            })
+    else:
+        # No cap, take all candidates
+        final_priority_set = {d for d, _ in priority_candidates}
+        logger.info(f"💾 Final priority list size: {len(final_priority_set):,} domains (No cap).")
+
     return (
         final_priority_set, abused_tlds, excluded_count_tld, 
         [d for d, _ in full_scored_list], # full_list (domain strings only)
@@ -335,12 +351,15 @@ def main():
     # 2. Recalculate MAX_SCORE based on active sources
     config.MAX_SCORE = sum(config.SOURCE_WEIGHTS.values())
     
-    # 3. Get min confidence score and TLD policy
+    # 3. Get min confidence score, TLD policy, and cap
+    priority_cap_val: Optional[int] = None # Cap is None by default
+    
     if aggressiveness_level == 11:
-        # Special case: Full list (min score 1) WITH TLDs removed
+        # Special case: Full list (min score 1) WITH TLDs removed AND 300k cap
         min_confidence_score = 1 
         use_tld_exclusion = True
-        logger.info(f"🛡️ Policy: SPECIAL CASE 11. Using FULL list (Min Score: 1) WITH TLD exclusion. (Max Score: {config.MAX_SCORE})")
+        priority_cap_val = 300_000 # <-- YOUR NEW RULE
+        logger.info(f"🛡️ Policy: SPECIAL CASE 11. Using FULL list (Min Score: 1), TLD exclusion ON, capped at {priority_cap_val:,}. (Max Score: {config.MAX_SCORE})")
     else:
         # Standard policy (1-10)
         min_confidence_score = config.POLICY_SCORE_MAP.get(aggressiveness_level, 10) # Default to 10
@@ -391,8 +410,9 @@ def main():
         # 3. Filter & Prioritize
         priority_set, abused_tlds, excluded_count_tld, full_list, tld_exclusion_counter, excluded_domains_verbose = filter_and_prioritize(
             combined_counter, logger, 
-            min_confidence_score,   # <-- NEW
-            use_tld_exclusion,      # <-- NEW
+            min_confidence_score,   # <-- Policy
+            use_tld_exclusion,      # <-- Policy
+            priority_cap_val,       # <-- Policy (NEW)
             args.block_tlds, 
             args.custom_tld_file, 
             args.no_hagezi_tlds
@@ -422,27 +442,29 @@ def main():
         generate_history_plot(history, logger)
         
         # Pass the "cap" value for reporting as the min score
-        report_cap_value = min_confidence_score if aggressiveness_level != 11 else f"1 (Filtered-Full)"
+        report_policy_str = f"Min Score: {min_confidence_score}"
+        if aggressiveness_level == 11:
+            report_policy_str = f"Min Score: 1 (Filtered-Full) | Cap: {priority_cap_val:,}"
         
         generate_markdown_report(
             priority_count, change, total_unfiltered, excluded_count_tld, full_list, combined_counter,
             overlap_counter, source_metrics, history, logger, domain_sources, change_report, 
             tld_exclusion_counter, 
-            report_cap_value,       # <-- MODIFIED
+            report_policy_str,      # <-- MODIFIED
             excluded_domains_verbose,
             jaccard_matrix,
             priority_set,
             priority_set_metrics,
             new_domain_metrics,
-            final_priority_filename # <-- NEW
+            final_priority_filename
         )
         
         # 7. File Writing
         write_output_files(
             priority_set, abused_tlds, full_list, logger, 
-            report_cap_value,       # <-- MODIFIED (used for header)
+            report_policy_str,      # <-- MODIFIED (used for header)
             excluded_domains_verbose, args.verbose_report, args.output_format,
-            final_priority_filename # <-- NEW
+            final_priority_filename
         )
         
         # 8. Save Metrics Cache
@@ -450,7 +472,7 @@ def main():
         
         # 9. Cleanup Archive by Size
         logger.info("Checking archive folder size limit...")
-        cleanup_archive_by_size(args.archive_limit_mb, logger) # <-- MODIFIED
+        cleanup_archive_by_size(args.archive_limit_mb)
         
     except Exception as e:
         logger.error(f"FATAL ERROR during execution: {e.__class__.__name__}: {e}")
