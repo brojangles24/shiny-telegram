@@ -10,10 +10,11 @@ import csv
 import logging
 import json
 import re
-import idna
+import math  # <-- ADDED
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Set, Optional, Tuple, Any
+import idna
 
 # Import settings from our config module
 from . import config
@@ -147,3 +148,39 @@ def process_domain(line: str) -> Optional[str]:
     if not config.DOMAIN_REGEX.match(ascii_domain): return None
 
     return ascii_domain
+
+# --- NEW: Phase 1 DPA Functions ---
+
+def calculate_entropy(domain: str) -> float:
+    """Calculates the Shannon entropy of the main domain part."""
+    # We only care about the entropy of the "SLD" (second-level domain)
+    # e.g., in 'ads.google.com', we only analyze 'google'
+    parts = domain.split('.')
+    if len(parts) > 1:
+        # Use the part before the TLD (e.g., 'google' from 'google.com')
+        # or ('ads' from 'ads.co.uk')
+        domain_part = parts[-2]
+    else:
+        # Failsafe for a domain like 'localhost'
+        domain_part = domain
+
+    if not domain_part:
+        return 0.0
+        
+    p, l = Counter(domain_part), float(len(domain_part))
+    return -sum(count/l * math.log2(count/l) for count in p.values())
+
+def get_ngrams(domain: str, n: int) -> list:
+    """Extracts n-grams from the main domain part."""
+    parts = domain.split('.')
+    if len(parts) > 1:
+        domain_part = parts[-2]
+    else:
+        domain_part = domain
+    
+    return [domain_part[i:i+n] for i in range(len(domain_part)-n+1)]
+
+def get_domain_depth(domain: str) -> int:
+    """Calculates the subdomain depth. 'google.com' is 1. 'ads.google.com' is 2."""
+    # We count the dots. 'google.com' (1 dot) is depth 1.
+    return domain.count('.')
