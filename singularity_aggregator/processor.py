@@ -33,10 +33,10 @@ from .reporting import (
     generate_history_plot, generate_jaccard_heatmap,
     generate_historical_trends_plot
 )
-# --- Import historical and NEW ledger modules ---
+# Import historical and ledger modules
 from . import historical
-from . import ledger # <-- NEW
-# --- Phase 1 DPA Imports ---
+from . import ledger
+# Phase 1 DPA Imports
 from .utils import calculate_entropy, get_ngrams, get_domain_depth
 
 # --- Core Aggregation & Scoring ---
@@ -426,6 +426,12 @@ def main():
         new_domains = {d['domain'] for d in change_report.get('added', [])}
         new_domain_metrics = analyze_domain_properties(new_domains)
 
+        # --- NEW: 5.6 Calculate Priority List Score Metrics ---
+        logger.info("🔬 Analyzing score properties for Priority List...")
+        priority_list_total_score = sum(combined_counter[d] for d in priority_set)
+        priority_list_avg_score = (priority_list_total_score / priority_count) if priority_count > 0 else 0
+        # --- END NEW ---
+
         # 6. Reporting & Visualization
         generate_static_score_histogram(combined_counter, full_list, logger)
         generate_history_plot(history, logger)
@@ -441,6 +447,7 @@ def main():
             priority_set,
             priority_set_metrics,
             new_domain_metrics,
+            priority_list_avg_score,  # <-- NEW
             final_priority_filename
         )
 
@@ -455,13 +462,13 @@ def main():
         # 8. Save Metrics Caches
         save_metrics_cache(source_metrics)
         historical.create_and_save_snapshot(
-            logger, priority_count, priority_set_metrics, new_domain_metrics,
+            logger, priority_count, priority_list_avg_score, # <-- NEW
+            priority_set_metrics, new_domain_metrics,
             jaccard_matrix, change_report, tld_exclusion_counter
         )
 
-        # --- NEW: 8.5 Update Domain Ledger (Phase 3a) ---
+        # 8.5 Update Domain Ledger (Phase 3a)
         ledger.update_ledger(combined_counter, priority_set, logger)
-        # --- END NEW ---
 
         # 9. Cleanup Archive by Size
         logger.info("Checking archive folder size limit...")
