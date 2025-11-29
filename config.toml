@@ -15,13 +15,13 @@ aggressiveness = 1
 # Master switch for TLD filtering (for levels 1-10).
 # true = (Default) Exclude domains matching the abusive TLD list.
 # false = Include all domains, regardless of TLD (more aggressive blocking).
-use_tld_exclusion = true
+use_tld_exclusion = false
 
 [policy_score_map]
 # Maps aggressiveness level (1-10) to the minimum REQUIRED CONFIDENCE (as a percentage).
 # (Weights: Hagezi=6, 1Hosts-Lite=5, OISD=4, AdGuard=5, Anudeep=4, Adaway=3, Steven=2)
 # (Max Score: 29)
-1 = 70  # (Score >= 21) - Extremely High Confidence
+1 = 65  # (Score >= 21) - Extremely High Confidence
 2 = 60  # (Score >= 18)
 3 = 50  # (Score >= 15)
 4 = 40  # (Score >= 12) - High Confidence (e.g., Hagezi + 1Hosts + Adaway)
