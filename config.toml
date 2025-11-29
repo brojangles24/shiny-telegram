@@ -96,14 +96,14 @@ consensus_threshold = 6
 # Weights applied to each source
 [scoring.weights]
 # Both Lite and Xtra are defined. The script will pick one.
-HAGEZI_ULTIMATE = 4
-1HOSTS_LITE = 3
+HAGEZI_ULTIMATE = 5
+1HOSTS_LITE = 4
 1HOSTS_XTRA = 1 # New
-OISD_BIG = 2
-ANUDEEP_ADSERVERS = 2
-ADAWAY_HOSTS = 2
-STEVENBLACK_HOSTS = 1
-ADGUARD_BASE = 3
+OISD_BIG = 3
+ANUDEEP_ADSERVERS = 3
+ADAWAY_HOSTS = 3
+STEVENBLACK_HOSTS = 2
+ADGUARD_BASE = 4
 
 [sources]
 # The blocklist sources to aggregate
