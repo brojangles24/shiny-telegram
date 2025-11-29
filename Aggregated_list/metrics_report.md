@@ -1,15 +1,15 @@
 # 🛡️ Singularity DNS Blocklist Dashboard (v5.8.4)
-*Generated: 2025-11-29 05:22:49*
+*Generated: 2025-11-29 05:29:10*
 
 ## 📜 Aggregation Summary
 | Metric | Count | Insight |
 | :--- | :---: | :--- |
 | **Total Scored Domains** | **531,517** | Size of the list including TLD rejected entries. |
 | Change vs. Last Run | `+0` ➡️ | Trend in the total unique domain pool. |
-| Priority List Size | 300,000 | Domains with **Min Score: 1 (Filtered-Full) | Cap: 300,000** (Max: 33). |
+| Priority List Size | 129,923 | Domains with **Min Confidence: 35% (Score >= 12)** (Max: 33). |
 | High Consensus (Score 11+) | 133,278 | Domains backed by strong weighted evidence. |
-| **Avg. Priority Score** | **9.74** | Average confidence score of the final list. |
-| TLD Filter Exclusions | 66,710 | Domains rejected by the abusive TLD list. |
+| **Avg. Priority Score** | **16.32** | Average confidence score of the final list. |
+| TLD Filter Exclusions | 0 | Domains rejected by the abusive TLD list. |
 
 ---
 
@@ -17,55 +17,33 @@
 These are the highest-scoring domains that failed to make the final list:
 | Domain | Weighted Score | Exclusion Reason |
 | :--- | :---: | :--- |
-| `stats.ozwebsites.biz` | <span style='color:red;'>**30**</span> | TLD Rejected: **.biz is marked as abusive.** |
-| `zlp6s.pw` | <span style='color:red;'>**30**</span> | TLD Rejected: **.pw is marked as abusive.** |
-| `adserve.work` | <span style='color:red;'>**29**</span> | TLD Rejected: **.work is marked as abusive.** |
-| `optimix.asia` | <span style='color:red;'>**29**</span> | TLD Rejected: **.asia is marked as abusive.** |
-| `ad.weplayer.cc` | <span style='color:red;'>**29**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `bonjour-prime.fr` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
-| `k-ion-base-login.pages.dev` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
-| `secureatt16.godaddysites.com` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
-| `techgenerator.xyz` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
-| `and.start.page` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
+| `aax-us-pdx-rtb.amazon-adsystem.com` | <span style='color:orange;'>**11**</span> | Score Cutoff: **11 is below minimum confidence 12.** |
+| `aax-us-west-rtb.amazon-adsystem.com` | <span style='color:orange;'>**11**</span> | Score Cutoff: **11 is below minimum confidence 12.** |
+| `analytics.ccs.mcafee.com` | <span style='color:orange;'>**11**</span> | Score Cutoff: **11 is below minimum confidence 12.** |
+| `pad.mymovies.it` | <span style='color:orange;'>**11**</span> | Score Cutoff: **11 is below minimum confidence 12.** |
+| `d3ujids68p6xmq.cloudfront.net` | <span style='color:orange;'>**11**</span> | Score Cutoff: **11 is below minimum confidence 12.** |
 
-*The complete list of 231,517 excluded domains is in `excluded_domains_report.csv`.*
-
----
-
-## 🚫 Top 10 Abusive TLD Trends
-Domains with these TLDs were excluded from the priority list.
-| Rank | Abusive TLD | Excluded Domain Count |
-| :---: | :--- | :---: |
-| 1 | **.top** | 7,727 |
-| 2 | **.shop** | 6,089 |
-| 3 | **.online** | 4,611 |
-| 4 | **.cfd** | 4,073 |
-| 5 | **.click** | 3,867 |
-| 6 | **.icu** | 3,800 |
-| 7 | **.site** | 3,732 |
-| 8 | **.space** | 3,004 |
-| 9 | **.sbs** | 2,607 |
-| 10 | **.store** | 2,484 |
+*The complete list of 401,594 excluded domains is in `excluded_domains_report.csv`.*
 
 ---
 
 ## 🔄 Priority List Change & Novelty Index
 | Change Type | Domain Count | Novelty Breakdown |
 | :--- | :---: | :--- |
-| **Domains Added** | 277,886 | **277,886 Fresh** ✨ |
-| **Domains Removed** | 9,120 | |
-| **Domains Remained** | 22,114 | |
+| **Domains Added** | 98,689 | **98,689 Fresh** ✨ |
+| **Domains Removed** | 0 | |
+| **Domains Remained** | 31,234 | |
 
 ## 🌐 Source Performance & Health Check
 | Source | Category | Weight | FP Risk | Coverage | Total Fetched | % In Priority | Volatility ($\pm \%$) | Color |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **HAGEZI_ULTIMATE** | Aggregated/Wildcard | 7 | **High 🟥** | **Broad 🟩** | 234,133 | **79.96%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#d62728;'>███</span> |
-| **1HOSTS_LITE** | Aggregated/Wildcard | 6 | **Medium 🟨** | **Broad 🟩** | 92,444 | **85.30%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#2ca02c;'>███</span> |
-| **OISD_BIG** | Aggregated/Wildcard | 5 | **High 🟥** | **Broad 🟩** | 216,323 | **64.90%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#1f77b4;'>███</span> |
-| **ADGUARD_BASE** | ABP Rule List | 5 | **Medium 🟨** | **Medium 🟨** | 119,995 | **47.74%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#17becf;'>███</span> |
-| **ANUDEEP_ADSERVERS** | Specialized (Ads) | 4 | **High 🟥** | **Specialized 🟦** | 42,347 | **16.64%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#9467bd;'>███</span> |
-| **STEVENBLACK_HOSTS** | Hosts File (Legacy) | 3 | **High 🟥** | **Medium 🟨** | 88,075 | **38.26%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#ff7f0e;'>███</span> |
-| **ADAWAY_HOSTS** | Specialized (Ads) | 3 | **Low 🟩** | **Specialized 🟦** | 6,540 | **99.20%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#8c564b;'>███</span> |
+| **HAGEZI_ULTIMATE** | Aggregated/Wildcard | 7 | **High 🟥** | **Broad 🟩** | 234,133 | **54.68%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#d62728;'>███</span> |
+| **1HOSTS_LITE** | Aggregated/Wildcard | 6 | **Medium 🟨** | **Broad 🟩** | 92,444 | **71.69%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#2ca02c;'>███</span> |
+| **OISD_BIG** | Aggregated/Wildcard | 5 | **High 🟥** | **Broad 🟩** | 216,323 | **39.43%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#1f77b4;'>███</span> |
+| **ADGUARD_BASE** | ABP Rule List | 5 | **Medium 🟨** | **Medium 🟨** | 119,995 | **56.13%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#17becf;'>███</span> |
+| **ANUDEEP_ADSERVERS** | Specialized (Ads) | 4 | **High 🟥** | **Specialized 🟦** | 42,347 | **5.62%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#9467bd;'>███</span> |
+| **STEVENBLACK_HOSTS** | Hosts File (Legacy) | 3 | **High 🟥** | **Medium 🟨** | 88,075 | **17.43%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#ff7f0e;'>███</span> |
+| **ADAWAY_HOSTS** | Specialized (Ads) | 3 | **Low 🟩** | **Specialized 🟦** | 6,540 | **37.13%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#8c564b;'>███</span> |
 
 ---
 
@@ -98,57 +76,52 @@ Distribution of domains across multiple sources (as a percentage of the Total Sc
 A 'nerd-out' deep-dive into the *properties* of the domains being blocked.
 
 ### 1. Final Priority List Composition
-Analysis of all domains in the final `filtered-full_priority_list.txt` list.
+Analysis of all domains in the final `priority_list.txt` list.
 
-**Top 15 TLDs in `filtered-full_priority_list.txt`:**
+**Top 15 TLDs in `priority_list.txt`:**
 | Rank | TLD | Domain Count | % of Priority List |
 | :---: | :--- | :---: | :---: |
-| 1 | **.com** | 182,931 | 60.98% |
-| 2 | **.net** | 23,874 | 7.96% |
-| 3 | **.pro** | 7,329 | 2.44% |
-| 4 | **.org** | 6,933 | 2.31% |
-| 5 | **.de** | 6,593 | 2.20% |
-| 6 | **.ru** | 6,487 | 2.16% |
-| 7 | **.xyz** | 5,593 | 1.86% |
-| 8 | **.fr** | 5,055 | 1.69% |
-| 9 | **.cn** | 3,967 | 1.32% |
-| 10 | **.info** | 3,904 | 1.30% |
-| 11 | **.io** | 3,741 | 1.25% |
-| 12 | **.app** | 3,576 | 1.19% |
-| 13 | **.pl** | 2,242 | 0.75% |
-| 14 | **.dev** | 2,122 | 0.71% |
-| 15 | **.uk** | 1,933 | 0.64% |
+| 1 | **.com** | 63,348 | 48.76% |
+| 2 | **.net** | 7,384 | 5.68% |
+| 3 | **.shop** | 3,628 | 2.79% |
+| 4 | **.top** | 3,417 | 2.63% |
+| 5 | **.de** | 2,881 | 2.22% |
+| 6 | **.click** | 2,416 | 1.86% |
+| 7 | **.online** | 2,099 | 1.62% |
+| 8 | **.site** | 2,033 | 1.56% |
+| 9 | **.org** | 1,839 | 1.42% |
+| 10 | **.ru** | 1,821 | 1.40% |
+| 11 | **.space** | 1,441 | 1.11% |
+| 12 | **.xyz** | 1,401 | 1.08% |
+| 13 | **.io** | 1,386 | 1.07% |
+| 14 | **.pro** | 1,337 | 1.03% |
+| 15 | **.store** | 1,258 | 0.97% |
 
 **Domain Properties:**
 | Property | Value | Insight |
 | :--- | :---: | :--- |
-| **Avg. Domain Entropy** | `2.753` | 'Randomness' score. (Higher = more 'random', e.g., DGA) |
-| **Top 5 Trigrams** | `ing`, `app`, `ion`, `ent`, `tra` | Common 3-letter strings in domain names. |
+| **Avg. Domain Entropy** | `2.795` | 'Randomness' score. (Higher = more 'random', e.g., DGA) |
+| **Top 5 Trigrams** | `ing`, `ion`, `ent`, `ter`, `ont` | Common 3-letter strings in domain names. |
 
 **Domain Depth (Subdomains):**
 | Depth | Domain Count | % of Priority List | Example |
 | :---: | :---: | :---: | :--- |
-| 1 (e.g., d.d) | 180,984 | 60.33% | `google.com` |
-| 2 (e.g., d.d.d) | 95,482 | 31.83% | `ads.google.com` |
-| 3 (e.g., d.d.d.d) | 18,091 | 6.03% | `sub.ads.google.com` |
-| 4 (e.g., d.d.d.d.d) | 4,058 | 1.35% | `sub.ads.google.com` |
-| 5 (e.g., d.d.d.d.d.d) | 793 | 0.26% | `sub.ads.google.com` |
-| 6 (e.g., d.d.d.d.d.d.d) | 284 | 0.09% | `sub.ads.google.com` |
-| 7 (e.g., d.d.d.d.d.d.d.d) | 39 | 0.01% | `sub.ads.google.com` |
-| 8 (e.g., d.d.d.d.d.d.d.d.d) | 49 | 0.02% | `sub.ads.google.com` |
-| 9 (e.g., d.d.d.d.d.d.d.d.d.d) | 134 | 0.04% | `sub.ads.google.com` |
-| 10 (e.g., d.d.d.d.d.d.d.d.d.d.d) | 63 | 0.02% | `sub.ads.google.com` |
-| 11 (e.g., d.d.d.d.d.d.d.d.d.d.d.d) | 14 | 0.00% | `sub.ads.google.com` |
-| 12 (e.g., d.d.d.d.d.d.d.d.d.d.d.d.d) | 1 | 0.00% | `sub.ads.google.com` |
-| 19 (e.g., d.d.d.d.d.d.d.d.d.d.d.d.d.d.d.d.d.d.d.d) | 7 | 0.00% | `sub.ads.google.com` |
-| 21 (e.g., d.d.d.d.d.d.d.d.d.d.d.d.d.d.d.d.d.d.d.d.d.d) | 1 | 0.00% | `sub.ads.google.com` |
+| 1 (e.g., d.d) | 85,586 | 65.87% | `google.com` |
+| 2 (e.g., d.d.d) | 37,573 | 28.92% | `ads.google.com` |
+| 3 (e.g., d.d.d.d) | 5,463 | 4.20% | `sub.ads.google.com` |
+| 4 (e.g., d.d.d.d.d) | 1,003 | 0.77% | `sub.ads.google.com` |
+| 5 (e.g., d.d.d.d.d.d) | 220 | 0.17% | `sub.ads.google.com` |
+| 6 (e.g., d.d.d.d.d.d.d) | 57 | 0.04% | `sub.ads.google.com` |
+| 7 (e.g., d.d.d.d.d.d.d.d) | 4 | 0.00% | `sub.ads.google.com` |
+| 8 (e.g., d.d.d.d.d.d.d.d.d) | 15 | 0.01% | `sub.ads.google.com` |
+| 9 (e.g., d.d.d.d.d.d.d.d.d.d) | 2 | 0.00% | `sub.ads.google.com` |
 
 ### 2. New Domain Threat Analysis
-Analysis of the **277,886** domains *added* to the list this run.
+Analysis of the **98,689** domains *added* to the list this run.
 | Property | Value | Insight |
 | :--- | :---: | :--- |
-| **Avg. *New* Domain Entropy** | `2.741` | 'Randomness' of *new* threats. A spike here is bad. |
-| **Top 5 *New* Trigrams** | `app`, `ing`, `ion`, `tra`, `ent` | Shows the 'shape' of new attack campaigns. |
+| **Avg. *New* Domain Entropy** | `2.737` | 'Randomness' of *new* threats. A spike here is bad. |
+| **Top 5 *New* Trigrams** | `ing`, `ion`, `tra`, `ent`, `tel` | Shows the 'shape' of new attack campaigns. |
 
 ---
 
