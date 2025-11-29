@@ -16,7 +16,7 @@ from typing import List, Dict, Set, Any, Union
 try:
     import plotly.graph_objects as go
     import plotly.io as pio
-    from plotly.subplots import make_subplots # <-- NEW IMPORT
+    from plotly.subplots import make_subplots
 except ImportError:
     logging.error("FATAL ERROR: Missing 'plotly' library.")
     logging.error("Please run: pip install plotly")
@@ -77,7 +77,7 @@ def generate_history_plot(history: List[Dict[str, str]], logger: ConsoleLogger):
             mode='lines+markers', line=dict(color='#1f77b4', width=2)
         ))
         fig.update_layout(
-            title='Historical Trend: Total Scored Domains',
+            title='Historical Trend: Total Scored Domains (DEPRECATED)',
             xaxis_title='Date', yaxis_title='Domain Count',
             template="plotly_dark", height=500, width=900
         )
@@ -125,7 +125,6 @@ def generate_jaccard_heatmap(matrix: Dict[str, Dict[str, float]], logger: Consol
         logger.error(f"Failed to write Jaccard heatmap image: {e}")
         logger.error("Plotly static image export may require 'kaleido'.")
 
-# --- NEW: Time-Series Trend Dashboard ---
 def generate_historical_trends_plot(logger: ConsoleLogger):
     """
     Generates a multi-metric dashboard plot from historical_metrics.json.
@@ -141,13 +140,12 @@ def generate_historical_trends_plot(logger: ConsoleLogger):
     try:
         dates = [datetime.strptime(h["date"], '%Y-%m-%d %H:%M:%S') for h in history]
         
-        # Create a 3-row subplot
         fig = make_subplots(
             rows=3, cols=1,
             shared_xaxes=True,
             subplot_titles=(
                 "List Size & Churn",
-                "Domain Entropy (Randomness)",
+                "Domain Properties (Score & Entropy)", # <-- UPDATED TITLE
                 "List Similarity (Jaccard)"
             )
         )
@@ -166,23 +164,27 @@ def generate_historical_trends_plot(logger: ConsoleLogger):
             name="Domains Removed", marker_color='#d62728'
         ), row=1, col=1)
 
-        # Row 2: Entropy
+        # Row 2: Entropy & Score
         fig.add_trace(go.Scatter(
-            x=dates, y=[h["avg_entropy"] for h in history],
-            name="Avg. Entropy (All)", mode='lines', line=dict(color='#ff7f0e')
+            x=dates, y=[h.get("avg_priority_score", 0.0) for h in history], # .get for safety
+            name="Avg. Priority Score", mode='lines', line=dict(color='#17becf')
         ), row=2, col=1)
         fig.add_trace(go.Scatter(
-            x=dates, y=[h["avg_new_domain_entropy"] for h in history],
+            x=dates, y=[h.get("avg_entropy", 0.0) for h in history],
+            name="Avg. Entropy (All)", mode='lines', line=dict(color='#ff7f0e', dash='dot')
+        ), row=2, col=1)
+        fig.add_trace(go.Scatter(
+            x=dates, y=[h.get("avg_new_domain_entropy", 0.0) for h in history],
             name="Avg. Entropy (New)", mode='lines', line=dict(color='#e377c2', dash='dot')
         ), row=2, col=1)
         
         # Row 3: Jaccard
         fig.add_trace(go.Scatter(
-            x=dates, y=[h["jaccard_hagezi_oisd"] for h in history],
+            x=dates, y=[h.get("jaccard_hagezi_oisd", 0.0) for h in history],
             name="Hagezi vs OISD", mode='lines', line=dict(color='#9467bd')
         ), row=3, col=1)
         fig.add_trace(go.Scatter(
-            x=dates, y=[h["jaccard_hagezi_1hosts"] for h in history],
+            x=dates, y=[h.get("jaccard_hagezi_1hosts", 0.0) for h in history],
             name="Hagezi vs 1Hosts", mode='lines', line=dict(color='#8c564b')
         ), row=3, col=1)
 
@@ -193,11 +195,11 @@ def generate_historical_trends_plot(logger: ConsoleLogger):
             height=900,
             width=1200,
             barmode='relative',
-            legend_tracegroupgap=180 # Space out legends
+            legend_tracegroupgap=180
         )
         fig.update_xaxes(title_text="Date", row=3, col=1)
         fig.update_yaxes(title_text="Domain Count", row=1, col=1)
-        fig.update_yaxes(title_text="Entropy", row=2, col=1)
+        fig.update_yaxes(title_text="Score / Entropy", row=2, col=1) # <-- UPDATED TITLE
         fig.update_yaxes(title_text="Jaccard Index", row=3, col=1)
 
         pio.write_image(fig, str(image_path), scale=1.5)
@@ -211,7 +213,9 @@ def generate_historical_trends_plot(logger: ConsoleLogger):
 # --- Markdown Reporting ---
 
 def generate_markdown_report(
-    priority_count: int, change: int, total_unfiltered: int, excluded_count_tld: int, 
+    priority_count: int,
+    avg_priority_score: float, # <-- NEW
+    change: int, total_unfiltered: int, excluded_count_tld: int, 
     full_list: List[str], combined_counter: Counter, overlap_counter: Counter, 
     source_metrics: Dict[str, Dict[str, Union[int, str]]],
     history: List[Dict[str, str]], logger: ConsoleLogger, domain_sources: Dict[str, Set[str]],
@@ -244,6 +248,9 @@ def generate_markdown_report(
     report.append(f"| Change vs. Last Run | `{change:+}` {trend_icon} | Trend in the total unique domain pool. |")
     report.append(f"| Priority List Size | {priority_count:,} | Domains with **{min_confidence_score}** (Max: {config.MAX_SCORE}). |")
     report.append(f"| High Consensus (Score {config.CONSENSUS_THRESHOLD}+) | {high_consensus_count:,} | Domains backed by strong weighted evidence. |")
+    # --- NEW ROW ---
+    report.append(f"| **Avg. Priority Score** | **{avg_priority_score:.2f}** | Average confidence score of the final list. |")
+    # --- END NEW ROW ---
     report.append(f"| TLD Filter Exclusions | {excluded_count_tld:,} | Domains rejected by the abusive TLD list. |")
     report.append("\n---")
     
@@ -329,7 +336,6 @@ def generate_markdown_report(
         
         uniqueness_ratio = (unique_count / fetched_count) if fetched_count > 0 else 0
 
-        # 1. FP Risk Rating (False Positives)
         if uniqueness_ratio > 0.4:
             fp_risk_rating = "High 🟥"
         elif uniqueness_ratio > 0.15:
@@ -337,11 +343,10 @@ def generate_markdown_report(
         else:
             fp_risk_rating = "Low 🟩"
             
-        # 2. Coverage Rating (Missed Domains)
         if "Aggregated" in category:
             coverage_rating = "Broad 🟩"
         elif "Specialized" in category:
-            coverage_rating = "Specialized 🟦" # Designed to "miss" other domains
+            coverage_rating = "Specialized 🟦"
         else:
             coverage_rating = "Medium 🟨"
 
@@ -435,7 +440,6 @@ def generate_markdown_report(
     
     report.append("\n## 📈 Interactive Visualization")
     report.append("\n\n\n\n")
-    # --- MODIFIED: Added new trends chart ---
     report.append(f"See `historical_trends_chart.png`, `score_distribution_chart.png`, and `jaccard_heatmap.png`.")
     report.append(f"The old `historical_trend_chart.png` only shows total domains. The new **`historical_trends_chart.png`** is a full dashboard.")
     
