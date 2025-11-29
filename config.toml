@@ -2,19 +2,59 @@
 # This file centralizes all settings from the Python script.
 
 [main]
-# (From argparse) Default cap for the priority list
-priority_cap = 300000
 # (From argparse) Output format: 'raw' (Unbound) or 'hosts' (Pi-hole)
 output_format = "raw"
 
+[policy]
+# Aggressiveness level (1-11).
+# This now controls the *minimum confidence score* (see [policy_score_map]).
+# 1 = High-Confidence (Score 15+), 5 = Balanced (Score 10+), 10 = Max (Score 3+)
+# 11 = Special: Full list (Score 1+) WITH TLD exclusion.
+aggressiveness = 5
+
+# Master switch for TLD filtering (for levels 1-10).
+# true = (Default) Exclude domains matching the abusive TLD list.
+# false = Include all domains, regardless of TLD (more aggressive blocking).
+use_tld_exclusion = true
+
+[policy_score_map]
+# Maps aggressiveness level (1-10) to the minimum weighted score
+# required for a domain to make the priority list.
+1 = 15
+2 = 14
+3 = 13
+4 = 12
+5 = 10 # Balanced
+6 = 8
+7 = 6  # Broad
+8 = 5
+9 = 4
+10 = 3 # Maximal
+
+[policy_label_map]
+# Human-readable labels for aggressiveness levels
+# 5 is the default and will not have a prefix
+1 = "tiny"
+2 = "tiny"
+3 = "minimal"
+4 = "minimal"
+5 = "priority" # The base name
+6 = "aggressive"
+7 = "aggressive"
+8 = "extreme"
+9 = "extreme"
+10 = "nuclear"
+11 = "filtered-full" # Label for level 11
+
 [paths]
-# (From argparse) Main output directory
+# Main output directory
 output_dir = "Aggregated_list"
-# (Derived from constant) Subdirectory for archives
+# Subdirectory for archives
 archive_dir_name = "archive"
 
-# (Constants) Output filenames
-priority_filename = "priority_300k.txt"
+# --- MODIFIED: This is now the BASE name. Prefixes will be added. ---
+priority_filename = "priority_list.txt" 
+
 regex_tld_filename = "regex_hagezi_tlds.txt"
 unfiltered_filename = "aggregated_full.txt"
 history_filename = "history.csv"
@@ -24,38 +64,41 @@ verbose_exclusion_file = "excluded_domains_report.csv"
 metrics_cache_file = "metrics_cache.json"
 
 [network]
-# (From argparse) Max concurrent fetch workers
+# Max concurrent fetch workers
 max_workers = 8
-# (Constant) Max retries for a failed list fetch
+# Max retries for a failed list fetch
 max_fetch_retries = 3
 
 [robustness]
-# (Constant) Days to keep old cache/history files
+# Days to keep old cache/history files
 cache_cleanup_days = 30
-# (From argparse) Max size of the archive folder in MB
+# Max size of the archive folder in MB
 archive_limit_mb = 50
 
 [tlds]
-# (Constant) Default URL for Hagezi's abused TLD list
+# Default URL for Hagezi's abused TLD list
 hagezi_abused_tlds_url = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/spam-tlds-onlydomains.txt"
-# (From argparse) Set to 'true' to disable fetching the Hagezi list
+# Set to 'true' to disable fetching the Hagezi list
 no_hagezi_tlds = false
-# (From argparse) Path to a custom file of TLDs to block (leave blank if unused)
-custom_tld_file = [] # e.g., "my_custom_tlds.txt"
-
-# (From main()) Custom TLDs to add to the blocklist
-# This replaces the `my_custom_tlds = []` list in the script.
-# The script logic to merge/replace can be simplified to just use this list.
-custom_block_tlds = []
+# Path to a custom file of TLDs to block (leave blank if unused)
+custom_tld_file = "" # e.g., "my_custom_tlds.txt"
+# Custom TLDs to add to the blocklist
+custom_block_tlds = [
+    # "xyz",
+    # "ru",
+    # "cn"
+]
 
 [scoring]
-# (Constant) Weighted score threshold for "High Consensus"
+# Weighted score threshold for "High Consensus"
 consensus_threshold = 6
 
-# (Constant) Weights applied to each source
+# Weights applied to each source
 [scoring.weights]
+# Both Lite and Xtra are defined. The script will pick one.
 HAGEZI_ULTIMATE = 4
 "1HOSTS_LITE" = 3
+"1HOSTS_XTRA" = 3 # New
 OISD_BIG = 2
 ANUDEEP_ADSERVERS = 2
 ADAWAY_HOSTS = 2
@@ -63,35 +106,38 @@ STEVENBLACK_HOSTS = 1
 ADGUARD_BASE = 3
 
 [sources]
-# (Constant) The blocklist sources to aggregate
+# The blocklist sources to aggregate
 HAGEZI_ULTIMATE = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/ultimate-onlydomains.txt"
 OISD_BIG = "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_big.txt"
 "1HOSTS_LITE" = "https://raw.githubusercontent.com/badmojr/1Hosts/refs/heads/master/Lite/domains.wildcards"
+"1HOSTS_XTRA" = "https://raw.githubusercontent.com/badmojr/1Hosts/master/Xtra/domains.wildcards" # New
 STEVENBLACK_HOSTS = "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
 ANUDEEP_ADSERVERS = "https://raw.githubusercontent.com/anudeepND/blacklist/master/adservers.txt"
 ADAWAY_HOSTS = "https://adaway.org/hosts.txt"
 ADGUARD_BASE = "https://filters.adtidy.org/extension/chromium/filters/15.txt"
 
-[metadata]
-# (Constant) Categories for reporting
 [metadata.categories]
+# Categories for reporting
 HAGEZI_ULTIMATE = "Aggregated/Wildcard"
 OISD_BIG = "Aggregated/Wildcard"
 "1HOSTS_LITE" = "Aggregated/Wildcard"
+"1HOSTS_XTRA" = "Aggregated/Wildcard" # New
 STEVENBLACK_HOSTS = "Hosts File (Legacy)"
 ANUDEEP_ADSERVERS = "Specialized (Ads)"
 ADAWAY_HOSTS = "Specialized (Ads)"
 ADGUARD_BASE = "ABP Rule List"
 
-# (Constant) Colors for reporting
 [metadata.colors]
+# Colors for reporting
 HAGEZI_ULTIMATE = "#d62728"
 OISD_BIG = "#1f77b4"
 "1HOSTS_LITE" = "#2ca02c"
+"1HOSTS_XTRA" = "#e377c2" # New
 STEVENBLACK_HOSTS = "#ff7f0e"
 ANUDEEP_ADSERVERS = "#9467bd"
 ADAWAY_HOSTS = "#8c564b"
 ADGUARD_BASE = "#17becf"
 
-# (Constant) Characters for ASCII sparkline
+[metadata.sparkline]
+# Characters for ASCII sparkline
 sparkline_chars = " ▂▃▄▅▆▇█"
