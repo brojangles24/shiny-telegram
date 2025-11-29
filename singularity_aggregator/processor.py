@@ -472,8 +472,8 @@ def main():
         
         # 9. Cleanup Archive by Size
         logger.info("Checking archive folder size limit...")
-        cleanup_archive_by_size(args.archive_limit_mb)
-        
+        cleanup_archive_by_size(args.archive_limit_mb, logger)
+
     except Exception as e:
         logger.error(f"FATAL ERROR during execution: {e.__class__.__name__}: {e}")
         if args.debug:
