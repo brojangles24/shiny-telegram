@@ -17,14 +17,12 @@ try:
 except ImportError:
     logging.error("FATAL ERROR: Missing 'plotly' library.")
     logging.error("Please run: pip install plotly")
-    # This will be caught by the main try/except in processor.py if it gets that far
-    # but it's good practice to check.
     raise
 # --- End Dependency Check ---
 
 # Import settings from our config module
 from . import config
-from .utils import ConsoleLogger, extract_tld # Import logger for type hinting
+from .utils import ConsoleLogger, extract_tld, Counter # Import logger for type hinting
 
 # --- Visualization ---
 
@@ -36,18 +34,21 @@ def generate_static_score_histogram(
     logger.info(f"📊 Generating static score distribution histogram at {image_path.name}")
     
     scores = [combined_counter[d] for d in full_list if combined_counter.get(d) is not None]
+    
+    # Use dynamic MAX_SCORE from config
+    max_score = config.MAX_SCORE
     score_levels = sorted(list(set(scores)), reverse=True)
 
     fig = go.Figure(data=[go.Histogram(
-        x=scores, xbins=dict(start=0, end=config.MAX_SCORE + 1, size=1), marker_color="#1f77b4"
+        x=scores, xbins=dict(start=0, end=max_score + 1, size=1), marker_color="#1f77b4"
     )])
 
     fig.update_layout(
         title='Weighted Score Distribution (All Scored Domains)',
         xaxis=dict(
             title='Weighted Score', 
-            tickvals=[s for s in score_levels if s % 2 == 0 or s == config.MAX_SCORE], 
-            range=[-0.5, config.MAX_SCORE + 0.5]
+            tickvals=[s for s in score_levels if s % 2 == 0 or s == max_score], 
+            range=[-0.5, max_score + 0.5]
         ),
         yaxis_title='Domain Count', bargap=0.05, template="plotly_dark"
     )
@@ -91,16 +92,17 @@ def generate_history_plot(history: List[Dict[str, str]], logger: ConsoleLogger):
 # --- Markdown Reporting ---
 
 def generate_markdown_report(
-    priority_count: int, change: int, total_unfiltered: int, excluded_count: int, 
+    priority_count: int, change: int, total_unfiltered: int, excluded_count_tld: int, 
     full_list: List[str], combined_counter: Counter, overlap_counter: Counter, 
     source_metrics: Dict[str, Dict[str, Union[int, str]]],
     history: List[Dict[str, str]], logger: ConsoleLogger, domain_sources: Dict[str, Set[str]],
-    change_report: Dict[str, List[Dict[str, Any]]], tld_exclusion_counter: Counter, priority_cap_val: int,
+    change_report: Dict[str, List[Dict[str, Any]]], tld_exclusion_counter: Counter, 
+    min_confidence_score: Union[int, str],  # <-- MODIFIED (can be int or str)
     excluded_domains_verbose: List[Dict[str, Any]],
     jaccard_matrix: Dict[str, Dict[str, float]],
     priority_set: Set[str],
-    priority_set_metrics: Dict[str, Any],  # <-- ADDED
-    new_domain_metrics: Dict[str, Any]      # <-- ADDED
+    priority_set_metrics: Dict[str, Any],
+    new_domain_metrics: Dict[str, Any]
 ):
     """
     Creates a detailed, aesthetic Markdown report with enhanced metrics.
@@ -120,9 +122,9 @@ def generate_markdown_report(
     report.append("| :--- | :---: | :--- |")
     report.append(f"| **Total Scored Domains** | **{len(full_list):,}** | Size of the list including TLD rejected entries. |") 
     report.append(f"| Change vs. Last Run | `{change:+}` {trend_icon} | Trend in the total unique domain pool. |")
-    report.append(f"| Priority List Size | {priority_count:,} | Capped domains selected (Cap: **{priority_cap_val:,}**). |")
+    report.append(f"| Priority List Size | {priority_count:,} | Domains with Score >= **{min_confidence_score}** (Max: {config.MAX_SCORE}). |")
     report.append(f"| High Consensus (Score {config.CONSENSUS_THRESHOLD}+) | {high_consensus_count:,} | Domains backed by strong weighted evidence. |")
-    report.append(f"| TLD Filter Exclusions | {excluded_count:,} | Domains rejected by the abusive TLD list. |")
+    report.append(f"| TLD Filter Exclusions | {excluded_count_tld:,} | Domains rejected by the abusive TLD list. |")
     report.append("\n---")
     
     if excluded_domains_verbose:
@@ -142,7 +144,7 @@ def generate_markdown_report(
         for d in score_excluded[:5]:
                 samples_to_show.append({
                 'domain': d['domain'], 'score': d['score'],
-                'reason': f"Score Cutoff: **Did not make Top {priority_cap_val:,}**"
+                'reason': f"Score Cutoff: **{d['reason'].split('Score ')[1]}**"
             })
         
         samples_to_show.sort(key=lambda x: x['score'], reverse=True)
@@ -186,6 +188,7 @@ def generate_markdown_report(
     report.append(r"| Source | Category | Weight | Total Fetched | In Priority List | % List In Priority | Volatility ($\pm \%$) | Color |")
     report.append("| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |")
     
+    # Use the (potentially modified) list of sources from config
     sorted_sources = sorted(config.BLOCKLIST_SOURCES.keys(), key=lambda n: config.SOURCE_WEIGHTS.get(n, 0), reverse=True)
     
     for name in sorted_sources:
@@ -254,7 +257,7 @@ def generate_markdown_report(
         report.append(f"| **{level}** | {count:,} | **{percent}** |")
     report.append("\n---")
 
-    # --- NEW: Phase 1 DPA Section ---
+    # --- Phase 1 DPA Section ---
     report.append("\n## 🔬 Domain Property Analysis (DPA)")
     report.append("A 'nerd-out' deep-dive into the *properties* of the domains being blocked.")
 
