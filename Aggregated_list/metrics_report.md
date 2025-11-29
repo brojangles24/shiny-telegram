@@ -1,14 +1,14 @@
 # 🛡️ Singularity DNS Blocklist Dashboard (v5.8.4)
-*Generated: 2025-11-28 23:09:45*
+*Generated: 2025-11-29 00:45:09*
 
 ## 📜 Aggregation Summary
 | Metric | Count | Insight |
 | :--- | :---: | :--- |
-| **Total Scored Domains** | **531,173** | Size of the list including TLD rejected entries. |
-| Change vs. Last Run | `+116` ⬆️ | Trend in the total unique domain pool. |
+| **Total Scored Domains** | **531,369** | Size of the list including TLD rejected entries. |
+| Change vs. Last Run | `+196` ⬆️ | Trend in the total unique domain pool. |
 | Priority List Size | 300,000 | Capped domains selected (Cap: **300,000**). |
-| High Consensus (Score 6+) | 132,283 | Domains backed by strong weighted evidence. |
-| TLD Filter Exclusions | 66,501 | Domains rejected by the abusive TLD list. |
+| High Consensus (Score 6+) | 132,358 | Domains backed by strong weighted evidence. |
+| TLD Filter Exclusions | 66,626 | Domains rejected by the abusive TLD list. |
 
 ---
 
@@ -16,18 +16,18 @@
 These are the highest-scoring domains that failed to make the final list:
 | Domain | Weighted Score | Exclusion Reason |
 | :--- | :---: | :--- |
+| `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
 | `adop.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `ad.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `zlp6s.pw` | <span style='color:red;'>**15**</span> | TLD Rejected: **.pw is marked as abusive.** |
-| `adserve.work` | <span style='color:red;'>**15**</span> | TLD Rejected: **.work is marked as abusive.** |
 | `stats.ozwebsites.biz` | <span style='color:red;'>**15**</span> | TLD Rejected: **.biz is marked as abusive.** |
-| `server488109.nazwa.pl` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
-| `norexvestapp.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
-| `omnicorp.org` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
-| `www-coursiers-espace.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
-| `ver1fybus1nes5-xloo.vercel.app` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `adserve.work` | <span style='color:red;'>**15**</span> | TLD Rejected: **.work is marked as abusive.** |
+| `crosspromotion.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `construcking.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `luxeedgefinance.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `tmao168.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `v9.aicontract.info` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `zenithcorevia.ru` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
 
-*The complete list of 231,173 excluded domains is available in `excluded_domains_report.csv` for deeper analysis.*
+*The complete list of 231,369 excluded domains is available in `excluded_domains_report.csv` for deeper analysis.*
 
 ---
 
@@ -35,33 +35,33 @@ These are the highest-scoring domains that failed to make the final list:
 Domains with these TLDs were excluded from the priority list.
 | Rank | Abusive TLD | Excluded Domain Count |
 | :---: | :--- | :---: |
-| 1 | **.top** | 7,692 |
-| 2 | **.shop** | 6,075 |
-| 3 | **.online** | 4,591 |
-| 4 | **.cfd** | 4,036 |
-| 5 | **.click** | 3,859 |
-| 6 | **.icu** | 3,777 |
-| 7 | **.site** | 3,726 |
+| 1 | **.top** | 7,715 |
+| 2 | **.shop** | 6,088 |
+| 3 | **.online** | 4,602 |
+| 4 | **.cfd** | 4,056 |
+| 5 | **.click** | 3,863 |
+| 6 | **.icu** | 3,790 |
+| 7 | **.site** | 3,730 |
 | 8 | **.space** | 3,002 |
-| 9 | **.sbs** | 2,585 |
-| 10 | **.store** | 2,477 |
+| 9 | **.sbs** | 2,602 |
+| 10 | **.store** | 2,482 |
 
 ---
 
 ## 🔄 Priority List Change & Novelty Index
 | Change Type | Domain Count | Novelty Breakdown |
 | :--- | :---: | :--- |
-| **Domains Added** | 18,870 | **18,870 Fresh** ✨ |
-| **Domains Removed** | 18,870 | |
-| **Domains Remained** | 281,130 | |
+| **Domains Added** | 18,871 | **18,871 Fresh** ✨ |
+| **Domains Removed** | 18,871 | |
+| **Domains Remained** | 281,129 | |
 
 ## 🌐 Source Performance & Health Check
 | Source | Category | Weight | Total Fetched | In Priority List | % List In Priority | Volatility ($\pm \%$) | Color |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **HAGEZI_ULTIMATE** | Aggregated/Wildcard | 4 | 234,133 | 187,206 | **79.96%** | <span style='color:green;'>`+0.1%`</span> | <span style='color:#d62728;'>███</span> |
+| **HAGEZI_ULTIMATE** | Aggregated/Wildcard | 4 | 234,133 | 187,206 | **79.96%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#d62728;'>███</span> |
 | **1HOSTS_LITE** | Aggregated/Wildcard | 3 | 92,444 | 78,851 | **85.30%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#2ca02c;'>███</span> |
-| **ADGUARD_BASE** | ABP Rule List | 3 | 119,911 | 98,952 | **82.52%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#17becf;'>███</span> |
-| **OISD_BIG** | Aggregated/Wildcard | 2 | 215,884 | 98,586 | **45.67%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#1f77b4;'>███</span> |
+| **ADGUARD_BASE** | ABP Rule List | 3 | 119,931 | 98,961 | **82.51%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#17becf;'>███</span> |
+| **OISD_BIG** | Aggregated/Wildcard | 2 | 216,246 | 98,702 | **45.64%** | <span style='color:green;'>`+0.2%`</span> | <span style='color:#1f77b4;'>███</span> |
 | **ANUDEEP_ADSERVERS** | Specialized (Ads) | 2 | 42,347 | 7,046 | **16.64%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#9467bd;'>███</span> |
 | **ADAWAY_HOSTS** | Specialized (Ads) | 2 | 6,540 | 6,488 | **99.20%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#8c564b;'>███</span> |
 | **STEVENBLACK_HOSTS** | Hosts File (Legacy) | 1 | 88,075 | 33,696 | **38.26%** | <span style='color:green;'>`+0.0%`</span> | <span style='color:#ff7f0e;'>███</span> |
@@ -78,10 +78,10 @@ Measures the overlap between lists (Intersection / Union). A high value (e.g., 0
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **1HOSTS_LITE** | `1.00` | 0.02 | 0.24 | 0.03 | 0.25 | 0.14 | 0.04 |
 | **ADAWAY_HOSTS** | 0.02 | `1.00` | 0.01 | 0.04 | 0.01 | 0.00 | 0.07 |
-| **ADGUARD_BASE** | 0.24 | 0.01 | `1.00` | 0.01 | 0.23 | 0.16 | 0.02 |
+| **ADGUARD_BASE** | 0.24 | 0.01 | `1.00` | 0.01 | 0.23 | 0.17 | 0.02 |
 | **ANUDEEP_ADSERVERS** | 0.03 | 0.04 | 0.01 | `1.00` | 0.01 | 0.01 | 0.03 |
 | **HAGEZI_ULTIMATE** | 0.25 | 0.01 | 0.23 | 0.01 | `1.00` | 0.23 | 0.05 |
-| **OISD_BIG** | 0.14 | 0.00 | 0.16 | 0.01 | 0.23 | `1.00` | 0.09 |
+| **OISD_BIG** | 0.14 | 0.00 | 0.17 | 0.01 | 0.23 | `1.00` | 0.09 |
 | **STEVENBLACK_HOSTS** | 0.04 | 0.07 | 0.02 | 0.03 | 0.05 | 0.09 | `1.00` |
 
 ---
@@ -93,10 +93,10 @@ Distribution of domains across multiple sources (as a percentage of the Total Sc
 | **7** | 110 | **0.02%** |
 | **6** | 693 | **0.13%** |
 | **5** | 2,547 | **0.48%** |
-| **4** | 30,675 | **5.77%** |
-| **3** | 36,255 | **6.83%** |
-| **2** | 89,313 | **16.81%** |
-| **1** | 371,580 | **69.95%** |
+| **4** | 30,680 | **5.77%** |
+| **3** | 36,349 | **6.84%** |
+| **2** | 89,296 | **16.80%** |
+| **1** | 371,694 | **69.95%** |
 
 ---
 
@@ -111,21 +111,21 @@ The most common TLDs in the final `priority_300k.txt` list.
 
 | Rank | TLD | Domain Count | % of Priority List |
 | :---: | :--- | :---: | :---: |
-| 1 | **.com** | 181,305 | 60.44% |
-| 2 | **.net** | 23,246 | 7.75% |
-| 3 | **.de** | 7,460 | 2.49% |
-| 4 | **.org** | 6,448 | 2.15% |
-| 5 | **.xyz** | 6,093 | 2.03% |
-| 6 | **.ru** | 5,597 | 1.87% |
-| 7 | **.pro** | 4,789 | 1.60% |
-| 8 | **.fr** | 4,093 | 1.36% |
-| 9 | **.cn** | 3,824 | 1.27% |
-| 10 | **.br** | 3,646 | 1.22% |
-| 11 | **.io** | 3,567 | 1.19% |
-| 12 | **.info** | 3,284 | 1.09% |
-| 13 | **.jp** | 3,020 | 1.01% |
-| 14 | **.app** | 2,428 | 0.81% |
-| 15 | **.pl** | 2,321 | 0.77% |
+| 1 | **.com** | 181,485 | 60.49% |
+| 2 | **.net** | 23,211 | 7.74% |
+| 3 | **.de** | 7,442 | 2.48% |
+| 4 | **.org** | 6,463 | 2.15% |
+| 5 | **.xyz** | 6,090 | 2.03% |
+| 6 | **.ru** | 5,659 | 1.89% |
+| 7 | **.pro** | 4,768 | 1.59% |
+| 8 | **.fr** | 4,051 | 1.35% |
+| 9 | **.cn** | 3,812 | 1.27% |
+| 10 | **.br** | 3,644 | 1.21% |
+| 11 | **.io** | 3,554 | 1.18% |
+| 12 | **.info** | 3,281 | 1.09% |
+| 13 | **.jp** | 3,017 | 1.01% |
+| 14 | **.app** | 2,355 | 0.78% |
+| 15 | **.pl** | 2,309 | 0.77% |
 
 ---
 
