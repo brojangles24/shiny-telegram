@@ -41,16 +41,12 @@ hagezi_abused_tlds_url = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@late
 # (From argparse) Set to 'true' to disable fetching the Hagezi list
 no_hagezi_tlds = false
 # (From argparse) Path to a custom file of TLDs to block (leave blank if unused)
-custom_tld_file = "" # e.g., "my_custom_tlds.txt"
+custom_tld_file = [] # e.g., "my_custom_tlds.txt"
 
 # (From main()) Custom TLDs to add to the blocklist
 # This replaces the `my_custom_tlds = []` list in the script.
 # The script logic to merge/replace can be simplified to just use this list.
-custom_block_tlds = [
-    # "xyz",
-    # "ru",
-    # "cn"
-]
+custom_block_tlds = []
 
 [scoring]
 # (Constant) Weighted score threshold for "High Consensus"
