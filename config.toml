@@ -91,19 +91,19 @@ custom_block_tlds = [
 
 [scoring]
 # Weighted score threshold for "High Consensus"
-consensus_threshold = 6
+consensus_threshold = 11
 
 # Weights applied to each source
 [scoring.weights]
 # Both Lite and Xtra are defined. The script will pick one.
-HAGEZI_ULTIMATE = 5
-1HOSTS_LITE = 4
-1HOSTS_XTRA = 1 # New
-OISD_BIG = 3
-ANUDEEP_ADSERVERS = 3
+HAGEZI_ULTIMATE = 6
+1HOSTS_LITE = 5
+1HOSTS_XTRA = 6 # New
+OISD_BIG = 4
+ANUDEEP_ADSERVERS = 4
 ADAWAY_HOSTS = 3
 STEVENBLACK_HOSTS = 2
-ADGUARD_BASE = 4
+ADGUARD_BASE = 5
 
 [sources]
 # The blocklist sources to aggregate
