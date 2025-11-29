@@ -217,9 +217,11 @@ def generate_markdown_report(
     report.append("\n---")
     
     report.append("\n## 🖇️ List Similarity Matrix (Jaccard Index)")
-    report.append("Measures the overlap between lists (Intersection / Union). A high value (e.g., 0.85) means the lists are very redundant.")
+    report.append("Measures the overlap between lists (Intersection / Union)...")
+
+    # Make sure this line is complete with the closing quote and parenthesis
     report.append("\n\n")
-    
+
     matrix_sources = sorted(jaccard_matrix.keys())
     header = "| Source |" + " | ".join([f"**{name[:6]}...**" for name in matrix_sources]) + " |"
     divider = "| :--- |" + " :---: |" * len(matrix_sources)
@@ -254,10 +256,7 @@ def generate_markdown_report(
 
     report.append("\n## 📊 Priority List Composition (Top 15 TLDs)")
     report.append(f"The most common TLDs in the final `{config.PRIORITY_FILENAME}` list.")
-    report.append("\n\n
-
-[Image of a vertical bar chart]
-\n\n")
+    report.append("\n\n\n\n")
     
     priority_tld_counter = Counter(extract_tld(d) for d in priority_set if extract_tld(d))
     
@@ -270,10 +269,7 @@ def generate_markdown_report(
     report.append("\n---")
     
     report.append("\n## 📈 Interactive Visualization")
-    report.append("\n\n
-
-[Image of a time series line graph]
-\n\n")
+    report.append("\n\n\n\n")
     report.append(f"See `historical_trend_chart.png` and `score_distribution_chart.png`.")
     
     # Write the report
