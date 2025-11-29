@@ -1,99 +1,143 @@
-"""
-Loads all settings from config.toml and makes them available
-as Python constants for other modules.
-"""
-import tomli
-import re
-from pathlib import Path
-from typing import Dict, List
+# config.toml for Singularity DNS Blocklist Aggregator (v5.8.4)
+# This file centralizes all settings from the Python script.
 
-try:
-    # Get the path to config.toml (which is in the parent directory of this file's parent)
-    CONFIG_PATH = Path(__file__).parent.parent / "config.toml"
-    
-    if not CONFIG_PATH.exists():
-        raise FileNotFoundError(f"config.toml not found at {CONFIG_PATH}")
+[main]
+# (From argparse) Output format: 'raw' (Unbound) or 'hosts' (Pi-hole)
+output_format = "raw"
 
-    with open(CONFIG_PATH, "rb") as f:
-        _config = tomli.load(f)
+[policy]
+# Aggressiveness level (1-11).
+# This now controls the *minimum confidence score* (see [policy_score_map]).
+# 1 = High-Confidence (Score 15+), 5 = Balanced (Score 10+), 10 = Max (Score 3+)
+# 11 = Special: Full list (Score 1+) WITH TLD exclusion.
+aggressiveness = 5
 
-    # --- [main] ---
-    MAIN = _config.get("main", {})
-    OUTPUT_FORMAT_DEFAULT = MAIN.get("output_format", "raw")
+# Master switch for TLD filtering (for levels 1-10).
+# true = (Default) Exclude domains matching the abusive TLD list.
+# false = Include all domains, regardless of TLD (more aggressive blocking).
+use_tld_exclusion = true
 
-    # --- [policy] ---
-    POLICY = _config.get("policy", {})
-    AGGRESSIVENESS_DEFAULT = POLICY.get("aggressiveness", 5)
-    USE_TLD_EXCLUSION_DEFAULT = POLICY.get("use_tld_exclusion", True)
+[policy_score_map]
+# Maps aggressiveness level (1-10) to the minimum weighted score
+# required for a domain to make the priority list.
+1 = 15
+2 = 14
+3 = 13
+4 = 12
+5 = 10 # Balanced
+6 = 8
+7 = 6  # Broad
+8 = 5
+9 = 4
+10 = 3 # Maximal
 
-    # --- [policy_score_map] ---
-    # Convert string keys from TOML to int keys
-    POLICY_SCORE_MAP: Dict[int, int] = {
-        int(k): v for k, v in _config.get("policy_score_map", {}).items()
-    }
+[policy_label_map]
+# Human-readable labels for aggressiveness levels
+# 5 is the default and will not have a prefix
+1 = "tiny"
+2 = "tiny"
+3 = "minimal"
+4 = "minimal"
+5 = "priority" # The base name
+6 = "aggressive"
+7 = "aggressive"
+8 = "extreme"
+9 = "extreme"
+10 = "nuclear"
+11 = "filtered-full" # Label for level 11
 
-    # --- [paths] ---
-    PATHS = _config.get("paths", {})
-    OUTPUT_DIR = Path(PATHS.get("output_dir", "Aggregated_list"))
-    ARCHIVE_DIR_NAME = PATHS.get("archive_dir_name", "archive")
-    ARCHIVE_DIR = OUTPUT_DIR / ARCHIVE_DIR_NAME
-    
-    PRIORITY_FILENAME = PATHS.get("priority_filename", "priority_list.txt")
-    REGEX_TLD_FILENAME = PATHS.get("regex_tld_filename", "regex_hagezi_tlds.txt")
-    UNFILTERED_FILENAME = PATHS.get("unfiltered_filename", "aggregated_full.txt")
-    HISTORY_FILENAME = PATHS.get("history_filename", "history.csv")
-    REPORT_FILENAME = PATHS.get("report_filename", "metrics_report.md")
-    DASHBOARD_HTML = PATHS.get("dashboard_html", "dashboard_html_removed.html")
-    VERBOSE_EXCLUSION_FILE = PATHS.get("verbose_exclusion_file", "excluded_domains_report.csv")
-    METRICS_CACHE_FILE = OUTPUT_DIR / PATHS.get("metrics_cache_file", "metrics_cache.json")
+[paths]
+# Main output directory
+output_dir = "Aggregated_list"
+# Subdirectory for archives
+archive_dir_name = "archive"
 
-    # --- [network] ---
-    NETWORK = _config.get("network", {})
-    MAX_WORKERS_DEFAULT = NETWORK.get("max_workers", 8)
-    MAX_FETCH_RETRIES = NETWORK.get("max_fetch_retries", 3)
+# --- MODIFIED: This is now the BASE name. Prefixes will be added. ---
+priority_filename = "priority_list.txt" 
 
-    # --- [robustness] ---
-    ROBUSTNESS = _config.get("robustness", {})
-    CACHE_CLEANUP_DAYS = ROBUSTNESS.get("cache_cleanup_days", 30)
-    ARCHIVE_LIMIT_MB_DEFAULT = ROBUSTNESS.get("archive_limit_mb", 50)
+regex_tld_filename = "regex_hagezi_tlds.txt"
+unfiltered_filename = "aggregated_full.txt"
+history_filename = "history.csv"
+report_filename = "metrics_report.md"
+dashboard_html = "dashboard_html_removed.html"
+verbose_exclusion_file = "excluded_domains_report.csv"
+metrics_cache_file = "metrics_cache.json"
 
-    # --- [tlds] ---
-    TLDS = _config.get("tlds", {})
-    HAGEZI_ABUSED_TLDS_URL = TLDS.get("hagezi_abused_tlds_url", "")
-    NO_HAGEZI_TLDS_DEFAULT = TLDS.get("no_hagezi_tlds", False)
-    
-    _custom_tld_file_raw = TLDS.get("custom_tld_file")  # This will get "" or None
-    CUSTOM_TLD_FILE_DEFAULT = _custom_tld_file_raw if _custom_tld_file_raw else None # This converts "" to None
-    
-    CUSTOM_BLOCK_TLDS = TLDS.get("custom_block_tlds", [])
+[network]
+# Max concurrent fetch workers
+max_workers = 8
+# Max retries for a failed list fetch
+max_fetch_retries = 3
 
-    # --- [scoring] ---
-    SCORING = _config.get("scoring", {})
-    CONSENSUS_THRESHOLD = SCORING.get("consensus_threshold", 6)
-    # This is now mutable, will be modified by processor.py
-    SOURCE_WEIGHTS: Dict[str, int] = _config.get("scoring", {}).get("weights", {})
-    
-    # MAX_SCORE will be calculated dynamically in processor.py after source list modification
-    MAX_SCORE = 0
+[robustness]
+# Days to keep old cache/history files
+cache_cleanup_days = 30
+# Max size of the archive folder in MB
+archive_limit_mb = 50
 
-    # --- [sources] ---
-    # This is now mutable, will be modified by processor.py
-    BLOCKLIST_SOURCES: Dict[str, str] = _config.get("sources", {})
+[tlds]
+# Default URL for Hagezi's abused TLD list
+hagezi_abused_tlds_url = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/spam-tlds-onlydomains.txt"
+# Set to 'true' to disable fetching the Hagezi list
+no_hagezi_tlds = false
+# Path to a custom file of TLDs to block (leave blank if unused)
+custom_tld_file = "" # e.g., "my_custom_tlds.txt"
+# Custom TLDs to add to the blocklist
+custom_block_tlds = [
+    # "xyz",
+    # "ru",
+    # "cn"
+]
 
-    # --- [metadata] ---
-    METADATA = _config.get("metadata", {})
-    SOURCE_CATEGORIES: Dict[str, str] = METADATA.get("categories", {})
-    SOURCE_COLORS: Dict[str, str] = METADATA.get("colors", {})
-    ASCII_SPARKLINE_CHARS: str = METADATA.get("sparkline_chars", " ▂▃▄▅▆▇█")
+[scoring]
+# Weighted score threshold for "High Consensus"
+consensus_threshold = 6
 
-    # --- Pre-compiled Regex (from original script) ---
-    DOMAIN_REGEX = re.compile(
-        r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
-    )
-    IPV4_REGEX = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
+# Weights applied to each source
+[scoring.weights]
+# Both Lite and Xtra are defined. The script will pick one.
+HAGEZI_ULTIMATE = 4
+"1HOSTS_LITE" = 3
+"1HOSTS_XTRA" = 3 # New
+OISD_BIG = 2
+ANUDEEP_ADSERVERS = 2
+ADAWAY_HOSTS = 2
+STEVENBLACK_HOSTS = 1
+ADGUARD_BASE = 3
 
-except Exception as e:
-    print(f"FATAL ERROR: Could not load config.toml: {e}")
-    print("Please ensure config.toml exists in the root directory and is valid.")
-    import sys
-    sys.exit(1)
+[sources]
+# The blocklist sources to aggregate
+HAGEZI_ULTIMATE = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/ultimate-onlydomains.txt"
+OISD_BIG = "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_big.txt"
+"1HOSTS_LITE" = "https://raw.githubusercontent.com/badmojr/1Hosts/refs/heads/master/Lite/domains.wildcards"
+"1HOSTS_XTRA" = "https://raw.githubusercontent.com/badmojr/1Hosts/master/Xtra/domains.wildcards" # New
+STEVENBLACK_HOSTS = "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
+ANUDEEP_ADSERVERS = "https://raw.githubusercontent.com/anudeepND/blacklist/master/adservers.txt"
+ADAWAY_HOSTS = "https://adaway.org/hosts.txt"
+ADGUARD_BASE = "https://filters.adtidy.org/extension/chromium/filters/15.txt"
+
+[metadata.categories]
+# Categories for reporting
+HAGEZI_ULTIMATE = "Aggregated/Wildcard"
+OISD_BIG = "Aggregated/Wildcard"
+"1HOSTS_LITE" = "Aggregated/Wildcard"
+"1HOSTS_XTRA" = "Aggregated/Wildcard" # New
+STEVENBLACK_HOSTS = "Hosts File (Legacy)"
+ANUDEEP_ADSERVERS = "Specialized (Ads)"
+ADAWAY_HOSTS = "Specialized (Ads)"
+ADGUARD_BASE = "ABP Rule List"
+
+[metadata.colors]
+# Colors for reporting
+HAGEZI_ULTIMATE = "#d62728"
+OISD_BIG = "#1f77b4"
+"1HOSTS_LITE" = "#2ca02c"
+"1HOSTS_XTRA" = "#e377c2" # New
+STEVENBLACK_HOSTS = "#ff7f0e"
+ANUDEEP_ADSERVERS = "#9467bd"
+ADAWAY_HOSTS = "#8c564b"
+ADGUARD_BASE = "#17becf"
+
+[metadata.sparkline]
+# Characters for ASCII sparkline
+sparkline_chars = " ▂▃▄▅▆▇█"
