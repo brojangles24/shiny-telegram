@@ -46,7 +46,7 @@ def save_historical_metrics(history: List[Dict[str, Any]], logger: ConsoleLogger
 def create_and_save_snapshot(
     logger: ConsoleLogger,
     priority_count: int,
-    priority_list_avg_score: float, # <-- NEW
+    avg_priority_score: float, # <-- NEW
     priority_set_metrics: Dict[str, Any],
     new_domain_metrics: Dict[str, Any],
     jaccard_matrix: Dict[str, Dict[str, float]],
@@ -69,7 +69,7 @@ def create_and_save_snapshot(
     snapshot = {
         "date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         "priority_list_size": priority_count,
-        "priority_list_avg_score": priority_list_avg_score, # <-- NEW
+        "avg_priority_score": avg_priority_score, # <-- NEW
         "avg_entropy": priority_set_metrics.get('avg_entropy', 0.0),
         "avg_new_domain_entropy": new_domain_metrics.get('avg_entropy', 0.0),
         "domains_added": len(change_report.get('added', [])),
