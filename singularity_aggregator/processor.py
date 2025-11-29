@@ -19,13 +19,21 @@ from itertools import combinations
 # Import settings from our config module
 from . import config
 # Import other modules from our package
-from .utils import ConsoleLogger, load_metrics_cache, save_metrics_cache, track_history, extract_tld
+from .utils import (
+    ConsoleLogger, load_metrics_cache, save_metrics_cache, track_history, 
+    extract_tld
+)
 from .file_handler import (
     cleanup_old_files, load_last_priority_from_archive, write_output_files, 
     cleanup_archive_by_size
 )
 from .fetcher import fetch_and_process_sources_async
-from .reporting import generate_markdown_report, generate_static_score_histogram, generate_history_plot
+from .reporting import (
+    generate_markdown_report, generate_static_score_histogram, 
+    generate_history_plot
+)
+# --- NEW: Phase 1 DPA Imports ---
+from .utils import calculate_entropy, get_ngrams, get_domain_depth
 
 # --- Core Aggregation & Scoring ---
 
@@ -226,6 +234,35 @@ def calculate_similarity_matrix(
         
     return matrix
 
+# --- NEW: Phase 1 DPA Function ---
+
+def analyze_domain_properties(domains: Set[str]) -> Dict[str, Any]:
+    """
+    Performs Domain Property Analysis (DPA) on a set of domains.
+    Returns a dictionary of calculated metrics.
+    """
+    if not domains:
+        return {
+            "avg_entropy": 0,
+            "top_trigrams": [],
+            "depth_counts": Counter()
+        }
+
+    total_entropy = 0
+    trigram_counter = Counter()
+    depth_counter = Counter()
+
+    for domain in domains:
+        total_entropy += calculate_entropy(domain)
+        trigram_counter.update(get_ngrams(domain, 3))
+        depth = get_domain_depth(domain)
+        depth_counter[depth] += 1
+
+    return {
+        "avg_entropy": total_entropy / len(domains),
+        "top_trigrams": trigram_counter.most_common(10),
+        "depth_counts": depth_counter
+    }
 
 # --- Main Execution ---
 def main():
@@ -265,8 +302,11 @@ def main():
         "--block-tlds", nargs='+', default=[],
         help="A space-separated list of custom TLDs to block (e.g., --block-tlds xyz ru cn)."
     )
+    _custom_tld_file_raw = config.TLDS.get("custom_tld_file")  # This will get "" or None
+    CUSTOM_TLD_FILE_DEFAULT = _custom_tld_file_raw if _custom_tld_file_raw else None # This converts "" to None
+    
     parser.add_argument(
-        "--custom-tld-file", type=Path, default=config.CUSTOM_TLD_FILE_DEFAULT,
+        "--custom-tld-file", type=Path, default=CUSTOM_TLD_FILE_DEFAULT,
         help="Path to a custom text file of TLDs to exclude (one per line)."
     )
     parser.add_argument(
@@ -325,6 +365,15 @@ def main():
         # 5. Priority List Change Tracking
         change_report = track_priority_changes(priority_set, old_priority_set, logger)
 
+        # --- NEW: 5.5 Domain Property Analysis ---
+        logger.info("🔬 Analyzing domain properties for Priority List...")
+        priority_set_metrics = analyze_domain_properties(priority_set)
+        
+        logger.info("🔬 Analyzing domain properties for *New* Domains...")
+        new_domains = {d['domain'] for d in change_report.get('added', [])}
+        new_domain_metrics = analyze_domain_properties(new_domains)
+        # --- END NEW ---
+
         # 6. Reporting & Visualization
         generate_static_score_histogram(combined_counter, full_list, logger)
         generate_history_plot(history, logger)
@@ -333,7 +382,10 @@ def main():
             priority_count, change, total_unfiltered, excluded_count, full_list, combined_counter,
             overlap_counter, source_metrics, history, logger, domain_sources, change_report, 
             tld_exclusion_counter, args.priority_cap, excluded_domains_verbose,
-            jaccard_matrix, priority_set
+            jaccard_matrix,
+            priority_set,
+            priority_set_metrics,  # <-- ADDED
+            new_domain_metrics     # <-- ADDED
         )
         
         # 7. File Writing
