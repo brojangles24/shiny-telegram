@@ -1,0 +1,13 @@
+[
+  {
+    "date": "2025-11-29 05:01:51",
+    "priority_list_size": 3068,
+    "avg_entropy": 2.581698537216037,
+    "avg_new_domain_entropy": 0,
+    "domains_added": 0,
+    "domains_removed": 50569,
+    "top_excluded_tld": "pw",
+    "jaccard_hagezi_oisd": 0.23033054194457644,
+    "jaccard_hagezi_1hosts": 0.24816354922299597
+  }
+]
