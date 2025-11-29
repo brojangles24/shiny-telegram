@@ -22,14 +22,14 @@ use_tld_exclusion = false
 # (Weights: Hagezi=6, 1Hosts-Lite=5, OISD=4, AdGuard=5, Anudeep=4, Adaway=3, Steven=2)
 # (Max Score: 29)
 1 = 70  # (Score >= 21) - Extremely High Confidence
-2 = 60  # (Score >= 18)
-3 = 50  # (Score >= 15)
-4 = 40  # (Score >= 12) - High Confidence (e.g., Hagezi + 1Hosts + Adaway)
-5 = 35  # (Score >= 11) - Balanced (e.g., Hagezi + 1Hosts)
-6 = 30  # (Score >= 9)  - Aggressive
-7 = 20  # (Score >= 6)  - Broad
-8 = 15  # (Score >= 5)
-9 = 10  # (Score >= 3)
+2 = 65  # (Score >= 18)
+3 = 60  # (Score >= 15)
+4 = 55  # (Score >= 12) - High Confidence (e.g., Hagezi + 1Hosts + Adaway)
+5 = 50  # (Score >= 11) - Balanced (e.g., Hagezi + 1Hosts)
+6 = 40  # (Score >= 9)  - Aggressive
+7 = 30  # (Score >= 6)  - Broad
+8 = 20  # (Score >= 5)
+9 = 15  # (Score >= 3)
 10 = 5  # (Score >= 2)  - Maximal (Catches almost everything)
 
 [policy_label_map]
