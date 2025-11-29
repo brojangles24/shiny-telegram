@@ -10,6 +10,7 @@ import csv
 import logging
 import json
 import re
+import idna
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Set, Optional, Tuple, Any
