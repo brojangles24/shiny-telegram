@@ -11,7 +11,7 @@ from collections import defaultdict
 # Import settings from our config module
 from . import config
 from .utils import ConsoleLogger # Import logger for type hinting
-from .processor import process_domain # Import domain processor
+from .utils import process_domain # Import domain processor
 
 async def fetch_list(
     session: aiohttp.ClientSession, url: str, name: str, logger: ConsoleLogger
