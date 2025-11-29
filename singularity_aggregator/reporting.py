@@ -98,7 +98,9 @@ def generate_markdown_report(
     change_report: Dict[str, List[Dict[str, Any]]], tld_exclusion_counter: Counter, priority_cap_val: int,
     excluded_domains_verbose: List[Dict[str, Any]],
     jaccard_matrix: Dict[str, Dict[str, float]],
-    priority_set: Set[str]
+    priority_set: Set[str],
+    priority_set_metrics: Dict[str, Any],  # <-- ADDED
+    new_domain_metrics: Dict[str, Any]      # <-- ADDED
 ):
     """
     Creates a detailed, aesthetic Markdown report with enhanced metrics.
@@ -217,11 +219,9 @@ def generate_markdown_report(
     report.append("\n---")
     
     report.append("\n## 🖇️ List Similarity Matrix (Jaccard Index)")
-    report.append("Measures the overlap between lists (Intersection / Union)...")
-
-    # Make sure this line is complete with the closing quote and parenthesis
+    report.append("Measures the overlap between lists (Intersection / Union). A high value (e.g., 0.85) means the lists are very redundant.")
     report.append("\n\n")
-
+    
     matrix_sources = sorted(jaccard_matrix.keys())
     header = "| Source |" + " | ".join([f"**{name[:6]}...**" for name in matrix_sources]) + " |"
     divider = "| :--- |" + " :---: |" * len(matrix_sources)
@@ -254,18 +254,54 @@ def generate_markdown_report(
         report.append(f"| **{level}** | {count:,} | **{percent}** |")
     report.append("\n---")
 
-    report.append("\n## 📊 Priority List Composition (Top 15 TLDs)")
-    report.append(f"The most common TLDs in the final `{config.PRIORITY_FILENAME}` list.")
-    report.append("\n\n\n\n")
+    # --- NEW: Phase 1 DPA Section ---
+    report.append("\n## 🔬 Domain Property Analysis (DPA)")
+    report.append("A 'nerd-out' deep-dive into the *properties* of the domains being blocked.")
+
+    # --- DPA Sub-Section 1: Priority List Composition ---
+    report.append("\n### 1. Final Priority List Composition")
+    report.append(f"Analysis of all domains in the final `{config.PRIORITY_FILENAME}` list.")
     
+    # DPA: TLDs
+    report.append("\n**Top 15 TLDs in Priority List:**")
     priority_tld_counter = Counter(extract_tld(d) for d in priority_set if extract_tld(d))
-    
     report.append("| Rank | TLD | Domain Count | % of Priority List |")
     report.append("| :---: | :--- | :---: | :---: |")
-    
     for rank, (tld, count) in enumerate(priority_tld_counter.most_common(15)):
-        percent = (count / priority_count * 100)
+        percent = (count / priority_count * 100) if priority_count > 0 else 0
         report.append(f"| {rank + 1} | **.{tld}** | {count:,} | {percent:.2f}% |")
+
+    # DPA: Entropy & N-grams
+    report.append("\n**Domain Properties:**")
+    report.append("| Property | Value | Insight |")
+    report.append("| :--- | :---: | :--- |")
+    report.append(f"| **Avg. Domain Entropy** | `{priority_set_metrics['avg_entropy']:.3f}` | 'Randomness' score. (Higher = more 'random', e.g., DGA) |")
+    
+    top_trigrams_str = ", ".join([f"`{tg}`" for tg, count in priority_set_metrics['top_trigrams'][:5]])
+    report.append(f"| **Top 5 Trigrams** | {top_trigrams_str} | Common 3-letter strings in domain names. |")
+
+    # DPA: Domain Depth
+    report.append("\n**Domain Depth (Subdomains):**")
+    report.append("| Depth | Domain Count | % of Priority List | Example |")
+    report.append("| :---: | :---: | :---: | :--- |")
+    depth_counts = priority_set_metrics['depth_counts']
+    for depth in sorted(depth_counts.keys()):
+        count = depth_counts[depth]
+        percent = (count / priority_count * 100) if priority_count > 0 else 0
+        example = "`google.com`" if depth == 1 else "`ads.google.com`" if depth == 2 else "`sub.ads.google.com`"
+        report.append(f"| {depth} (e.g., {'.'.join(['d']*(depth+1))}) | {count:,} | {percent:.2f}% | {example} |")
+
+    # --- DPA Sub-Section 2: New Domain Analysis ---
+    report.append("\n### 2. New Domain Threat Analysis")
+    new_domain_count = sum(new_domain_metrics.get("depth_counts", {}).values())
+    report.append(f"Analysis of the **{new_domain_count:,}** domains *added* to the list this run.")
+    
+    report.append("| Property | Value | Insight |")
+    report.append("| :--- | :---: | :--- |")
+    report.append(f"| **Avg. *New* Domain Entropy** | `{new_domain_metrics['avg_entropy']:.3f}` | 'Randomness' of *new* threats. A spike here is bad. |")
+    
+    new_trigrams_str = ", ".join([f"`{tg}`" for tg, count in new_domain_metrics['top_trigrams'][:5]])
+    report.append(f"| **Top 5 *New* Trigrams** | {new_trigrams_str} | Shows the 'shape' of new attack campaigns. |")
     report.append("\n---")
     
     report.append("\n## 📈 Interactive Visualization")
