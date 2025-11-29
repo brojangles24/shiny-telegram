@@ -57,8 +57,8 @@ def aggregate_and_score_domains(
 
 def filter_and_prioritize(
     combined_counter: Counter, logger: ConsoleLogger,
-    min_confidence_score: int,  # <-- NEW: Replaces priority_cap
-    use_tld_exclusion: bool,    # <-- NEW: Master switch
+    min_confidence_score: int,  # <-- Replaces priority_cap
+    use_tld_exclusion: bool,    # <-- Master switch
     args_block_tlds: List[str],
     args_custom_tld_file: Optional[Path],
     args_no_hagezi_tlds: bool
@@ -352,6 +352,17 @@ def main():
         logger.info(f"🛡️ Policy: Level {aggressiveness_level}/10 -> Min Score = {min_confidence_score} (Max: {config.MAX_SCORE})")
         if not use_tld_exclusion:
             logger.warning("🛡️ Policy: TLD exclusion is DISABLED.")
+
+    # 4. Determine Final Filename
+    policy_label = config.POLICY_LABEL_MAP.get(aggressiveness_level, "priority")
+    
+    # Level 5 ("priority") is the base, so it gets no prefix.
+    if policy_label == "priority":
+        final_priority_filename = config.PRIORITY_FILENAME
+    else:
+        final_priority_filename = f"{policy_label}_{config.PRIORITY_FILENAME}"
+    
+    logger.info(f"🛡️ Policy: Output filename will be {final_priority_filename}")
     # --- END OF NEW BLOCK ---
     
     start = datetime.now()
@@ -411,7 +422,7 @@ def main():
         generate_history_plot(history, logger)
         
         # Pass the "cap" value for reporting as the min score
-        report_cap_value = min_confidence_score if aggressiveness_level != 11 else f"1 (Full List)"
+        report_cap_value = min_confidence_score if aggressiveness_level != 11 else f"1 (Filtered-Full)"
         
         generate_markdown_report(
             priority_count, change, total_unfiltered, excluded_count_tld, full_list, combined_counter,
@@ -422,14 +433,16 @@ def main():
             jaccard_matrix,
             priority_set,
             priority_set_metrics,
-            new_domain_metrics
+            new_domain_metrics,
+            final_priority_filename # <-- NEW
         )
         
         # 7. File Writing
         write_output_files(
             priority_set, abused_tlds, full_list, logger, 
             report_cap_value,       # <-- MODIFIED (used for header)
-            excluded_domains_verbose, args.verbose_report, args.output_format
+            excluded_domains_verbose, args.verbose_report, args.output_format,
+            final_priority_filename # <-- NEW
         )
         
         # 8. Save Metrics Cache
@@ -437,7 +450,7 @@ def main():
         
         # 9. Cleanup Archive by Size
         logger.info("Checking archive folder size limit...")
-        cleanup_archive_by_size(args.archive_limit_mb, logger)
+        cleanup_archive_by_size(args.archive_limit_mb, logger) # <-- MODIFIED
         
     except Exception as e:
         logger.error(f"FATAL ERROR during execution: {e.__class__.__name__}: {e}")
