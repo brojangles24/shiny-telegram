@@ -9,7 +9,7 @@ import sys
 import argparse
 import asyncio
 import requests
-import math  # <-- ADDED
+import math
 from datetime import datetime
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -33,9 +33,10 @@ from .reporting import (
     generate_history_plot, generate_jaccard_heatmap,
     generate_historical_trends_plot
 )
-# Import historical module
+# --- Import historical and NEW ledger modules ---
 from . import historical
-# Phase 1 DPA Imports
+from . import ledger # <-- NEW
+# --- Phase 1 DPA Imports ---
 from .utils import calculate_entropy, get_ngrams, get_domain_depth
 
 # --- Core Aggregation & Scoring ---
@@ -48,7 +49,6 @@ def aggregate_and_score_domains(
     overlap_counter = Counter()
     domain_sources = defaultdict(set)
 
-    # Use the (potentially modified) SOURCE_WEIGHTS from config
     for name, domains in source_sets.items():
         weight = config.SOURCE_WEIGHTS.get(name, 1)
         for d in domains:
@@ -73,7 +73,6 @@ def filter_and_prioritize(
     """
     abused_tlds: Set[str] = set()
 
-    # --- Load TLDs (only if TLD exclusion is ON) ---
     if use_tld_exclusion:
         if not args_no_hagezi_tlds and config.HAGEZI_ABUSED_TLDS_URL:
             try:
@@ -118,29 +117,25 @@ def filter_and_prioritize(
     else:
         logger.warning("🛡️ Policy: Skipping all TLD exclusion filtering.")
 
-    # --- Start Filtering ---
     full_scored_list: List[Tuple[str, int]] = sorted(
         combined_counter.items(), key=lambda x: x[1], reverse=True
     )
 
-    priority_candidates: List[Tuple[str, int]] = []  # Domains that pass score/TLD
+    priority_candidates: List[Tuple[str, int]] = []
     excluded_count_tld = 0
     excluded_count_score = 0
     tld_exclusion_counter = Counter()
     excluded_domains_verbose: List[Dict[str, Any]] = []
 
     for domain, weight in full_scored_list:
-
-        # 1. Check Confidence Score
         if weight < min_confidence_score:
             excluded_count_score += 1
             excluded_domains_verbose.append({
                 'domain': domain, 'score': weight, 'status': 'SCORE CUTOFF',
                 'reason': f'Score {weight} is below minimum confidence {min_confidence_score}.'
             })
-            continue  # Skip to next domain
+            continue
 
-        # 2. Check TLD Exclusion (if enabled)
         if use_tld_exclusion:
             tld = extract_tld(domain)
             if tld in abused_tlds:
@@ -150,34 +145,29 @@ def filter_and_prioritize(
                     'domain': domain, 'score': weight, 'status': 'TLD EXCLUDED',
                     'reason': f'TLD .{tld} is marked as abusive.'
                 })
-                continue  # Skip to next domain
+                continue
 
-        # 3. If it passed all filters, add it to the candidate list
         priority_candidates.append((domain, weight))
 
     if use_tld_exclusion:
         logger.info(f"🔥 Excluded {excluded_count_tld:,} domains by TLD filter.")
     logger.info(f"🔥 Excluded {excluded_count_score:,} domains by Score filter (Min: {min_confidence_score}).")
 
-    # --- 4. Apply optional priority cap ---
     if priority_cap is not None:
         final_priority_set = {d for d, _ in priority_candidates[:priority_cap]}
         logger.info(f"💾 Priority list capped at {len(final_priority_set):,} domains (Cap: {priority_cap:,}).")
-
-        # Log domains that passed filters but failed cap
         for domain, score in priority_candidates[priority_cap:]:
             excluded_domains_verbose.append({
                 'domain': domain, 'score': score, 'status': 'CAP CUTOFF',
                 'reason': f'Scored {score} but did not make the top {priority_cap:,} list.'
             })
     else:
-        # No cap, take all candidates
         final_priority_set = {d for d, _ in priority_candidates}
         logger.info(f"💾 Final priority list size: {len(final_priority_set):,} domains (No cap).")
 
     return (
         final_priority_set, abused_tlds, excluded_count_tld,
-        [d for d, _ in full_scored_list],  # full_list (domain strings only)
+        [d for d, _ in full_scored_list],
         tld_exclusion_counter, excluded_domains_verbose
     )
 
@@ -196,7 +186,6 @@ def calculate_source_metrics(
         sources = domain_sources[domain]
         if domain in priority_set:
             for source in sources: metrics[source]["In_Priority_List"] += 1
-        # This is a domain that *only* appears in one source
         if overlap_counter[domain] == 1:
             unique_source = list(sources)[0]
             metrics[unique_source]["Unique_to_Source"] += 1
@@ -205,7 +194,6 @@ def calculate_source_metrics(
             current_fetched = len(domains)
             metrics[name]["Total_Fetched"] = current_fetched
             old_fetched = old_source_metrics.get(name, {}).get("Total_Fetched", 0)
-
             if old_fetched > 0:
                 change_pct = ((current_fetched - old_fetched) / old_fetched) * 100
                 metrics[name]["Volatility"] = f"{change_pct:+.1f}%"
@@ -253,41 +241,30 @@ def calculate_similarity_matrix(
     for name_a, name_b in combinations(source_names, 2):
         set_a = source_sets[name_a]
         set_b = source_sets[name_b]
-
         intersection = len(set_a & set_b)
         union = len(set_a | set_b)
         jaccard_index = (intersection / union) if union > 0 else 0.0
-
         matrix[name_a][name_b] = jaccard_index
         matrix[name_b][name_a] = jaccard_index
 
     for name in source_names:
         matrix[name][name] = 1.0
-
     return matrix
 
 def analyze_domain_properties(domains: Set[str]) -> Dict[str, Any]:
     """
     Performs Domain Property Analysis (DPA) on a set of domains.
-    Returns a dictionary of calculated metrics.
     """
     if not domains:
-        return {
-            "avg_entropy": 0,
-            "top_trigrams": [],
-            "depth_counts": Counter()
-        }
-
+        return {"avg_entropy": 0, "top_trigrams": [], "depth_counts": Counter()}
     total_entropy = 0
     trigram_counter = Counter()
     depth_counter = Counter()
-
     for domain in domains:
         total_entropy += calculate_entropy(domain)
         trigram_counter.update(get_ngrams(domain, 3))
         depth = get_domain_depth(domain)
         depth_counter[depth] += 1
-
     return {
         "avg_entropy": total_entropy / len(domains),
         "top_trigrams": trigram_counter.most_common(10),
@@ -299,24 +276,21 @@ def analyze_domain_properties(domains: Set[str]) -> Dict[str, Any]:
 def main():
     """Main function to run the aggregation process."""
     parser = argparse.ArgumentParser(description="Singularity DNS Blocklist Aggregator (v5.8.4)")
-
-    # Use defaults from config.py
+    
     parser.add_argument(
         "-o", "--output", type=Path, default=config.OUTPUT_DIR,
         help=f"Output directory (default: {config.OUTPUT_DIR})"
     )
     parser.add_argument("-d", "--debug", action="store_true", help="Enable DEBUG logging")
-
     parser.add_argument(
         "-a", "--aggressiveness", type=int, default=config.AGGRESSIVENESS_DEFAULT,
-        choices=range(1, 12), metavar="[1-11]",  # <-- ALLOWS 11
+        choices=range(1, 12), metavar="[1-11]",
         help=f"Policy level 1-11. 1-10=Score, 11=Full List w/ TLDs. (default: {config.AGGRESSIVENESS_DEFAULT})"
     )
     parser.add_argument(
         "--include-tlds", action="store_true",
         help="Bypass TLD filtering (more aggressive). Overrides 'use_tld_exclusion = true' in config."
     )
-
     parser.add_argument(
         "-w", "--max-workers", type=int, default=config.MAX_WORKERS_DEFAULT,
         help=f"Maximum concurrent network workers (default: {config.MAX_WORKERS_DEFAULT})"
@@ -334,8 +308,6 @@ def main():
         "--archive-limit-mb", type=int, default=config.ARCHIVE_LIMIT_MB_DEFAULT,
         help=f"Maximum size (MB) for the /archive folder. (default: {config.ARCHIVE_LIMIT_MB_DEFAULT})"
     )
-
-    # TLD Arguments
     parser.add_argument(
         "--block-tlds", nargs='+', default=[],
         help="A space-separated list of custom TLDs to block (e.g., --block-tlds xyz ru cn)."
@@ -348,22 +320,19 @@ def main():
         "--no-hagezi-tlds", action="store_true", default=config.NO_HAGEZI_TLDS_DEFAULT,
         help="Do not fetch the Hagezi abused TLD list."
     )
-
     args = parser.parse_args()
 
     # --- Setup ---
     logger = ConsoleLogger(args.debug)
-    # Set output dir based on args, and update config paths dynamically
     config.OUTPUT_DIR = args.output
     config.ARCHIVE_DIR = config.OUTPUT_DIR / config.ARCHIVE_DIR_NAME
     config.METRICS_CACHE_FILE = config.OUTPUT_DIR / config.PATHS.get("metrics_cache_file", "metrics_cache.json")
-
+    config.DOMAIN_LEDGER_FILE = config.OUTPUT_DIR / config.PATHS.get("domain_ledger_file", "domain_ledger.json")
     config.OUTPUT_DIR.mkdir(exist_ok=True)
 
     # --- Determine Policy from Config and Args ---
     aggressiveness_level = args.aggressiveness
 
-    # 1. Determine dynamic sources
     if 6 <= aggressiveness_level <= 10:
         logger.info(f"🛡️ Policy: Aggressiveness {aggressiveness_level}. Using 1Hosts (Xtra) instead of (Lite).")
         if "1HOSTS_LITE" in config.BLOCKLIST_SOURCES:
@@ -375,50 +344,31 @@ def main():
             del config.BLOCKLIST_SOURCES["1HOSTS_XTRA"]
             del config.SOURCE_WEIGHTS["1HOSTS_XTRA"]
 
-    # 2. Recalculate MAX_SCORE based on active sources
     config.MAX_SCORE = sum(config.SOURCE_WEIGHTS.values())
 
-    # 3. Get min confidence score, TLD policy, and cap
-    priority_cap_val: Optional[int] = None  # Cap is None by default
-    report_policy_str = ""  # For the report header
+    priority_cap_val: Optional[int] = None
+    report_policy_str = ""
     min_confidence_score_abs: int = 0
 
     if aggressiveness_level == 11:
-        # Special case: Full list (min score 1) WITH TLDs removed AND 300k cap
         min_confidence_score_abs = 1
         use_tld_exclusion = True
-        priority_cap_val = 300_000  # <-- YOUR RULE
+        priority_cap_val = 300_000
         report_policy_str = f"Min Score: 1 (Filtered-Full) | Cap: {priority_cap_val:,}"
         logger.info(f"🛡️ Policy: SPECIAL CASE 11. Using FULL list (Min Score: 1), TLD exclusion ON, capped at {priority_cap_val:,}. (Max Score: {config.MAX_SCORE})")
     else:
-        # Standard policy (1-10) - NOW USES PERCENTAGES
-        # Get the percentage from the config (e.g., 35)
-        min_confidence_pct = config.POLICY_SCORE_MAP.get(aggressiveness_level, 35) # Default to 35%
-
-        # --- THIS IS THE NEW LOGIC ---
-        # Convert the percentage (35%) into an absolute score
-        # e.g., (35 / 100) * 29 = 10.15 -> rounded up to 11
+        min_confidence_pct = config.POLICY_SCORE_MAP.get(aggressiveness_level, 35)
         min_confidence_score_abs = int(math.ceil((min_confidence_pct / 100) * config.MAX_SCORE))
-        # --- END NEW LOGIC ---
-
         use_tld_exclusion = config.USE_TLD_EXCLUSION_DEFAULT
-        # CLI flag --include-tlds overrides config
         if args.include_tlds:
             use_tld_exclusion = False
-
         report_policy_str = f"Min Confidence: {min_confidence_pct}% (Score >= {min_confidence_score_abs})"
         logger.info(f"🛡️ Policy: Level {aggressiveness_level}/10 -> {min_confidence_pct}% Confidence (Absolute Score >= {min_confidence_score_abs} out of {config.MAX_SCORE})")
         if not use_tld_exclusion:
             logger.warning("🛡️ Policy: TLD exclusion is DISABLED.")
 
-    # 4. Determine Final Filename
     policy_label = config.POLICY_LABEL_MAP.get(aggressiveness_level, "priority")
-
-    if policy_label == "priority":
-        final_priority_filename = config.PRIORITY_FILENAME
-    else:
-        final_priority_filename = f"{policy_label}_{config.PRIORITY_FILENAME}"
-
+    final_priority_filename = config.PRIORITY_FILENAME if policy_label == "priority" else f"{policy_label}_{config.PRIORITY_FILENAME}"
     logger.info(f"🛡️ Policy: Output filename will be {final_priority_filename}")
 
     start = datetime.now()
@@ -450,9 +400,9 @@ def main():
         # 3. Filter & Prioritize
         priority_set, abused_tlds, excluded_count_tld, full_list, tld_exclusion_counter, excluded_domains_verbose = filter_and_prioritize(
             combined_counter, logger,
-            min_confidence_score_abs,  # <-- Policy
-            use_tld_exclusion,       # <-- Policy
-            priority_cap_val,        # <-- Policy
+            min_confidence_score_abs,
+            use_tld_exclusion,
+            priority_cap_val,
             args.block_tlds,
             args.custom_tld_file,
             args.no_hagezi_tlds
@@ -472,21 +422,20 @@ def main():
         # 5.5 Domain Property Analysis
         logger.info("🔬 Analyzing domain properties for Priority List...")
         priority_set_metrics = analyze_domain_properties(priority_set)
-
         logger.info("🔬 Analyzing domain properties for *New* Domains...")
         new_domains = {d['domain'] for d in change_report.get('added', [])}
         new_domain_metrics = analyze_domain_properties(new_domains)
 
         # 6. Reporting & Visualization
         generate_static_score_histogram(combined_counter, full_list, logger)
-        generate_history_plot(history, logger)  # Old simple plot
-        generate_historical_trends_plot(logger) # <-- NEW Dashboard plot
+        generate_history_plot(history, logger)
+        generate_historical_trends_plot(logger)
 
         generate_markdown_report(
             priority_count, change, total_unfiltered, excluded_count_tld, full_list, combined_counter,
             overlap_counter, source_metrics, history, logger, domain_sources, change_report,
             tld_exclusion_counter,
-            report_policy_str,  # <-- Use the dynamic policy string
+            report_policy_str,
             excluded_domains_verbose,
             jaccard_matrix,
             priority_set,
@@ -498,7 +447,7 @@ def main():
         # 7. File Writing
         write_output_files(
             priority_set, abused_tlds, full_list, logger,
-            report_policy_str,  # <-- Use the dynamic policy string
+            report_policy_str,
             excluded_domains_verbose, args.verbose_report, args.output_format,
             final_priority_filename
         )
@@ -509,6 +458,10 @@ def main():
             logger, priority_count, priority_set_metrics, new_domain_metrics,
             jaccard_matrix, change_report, tld_exclusion_counter
         )
+
+        # --- NEW: 8.5 Update Domain Ledger (Phase 3a) ---
+        ledger.update_ledger(combined_counter, priority_set, logger)
+        # --- END NEW ---
 
         # 9. Cleanup Archive by Size
         logger.info("Checking archive folder size limit...")
