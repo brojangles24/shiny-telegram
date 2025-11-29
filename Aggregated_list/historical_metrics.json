@@ -234,5 +234,17 @@
     "top_excluded_tld": "top",
     "jaccard_hagezi_oisd": 0.2299906146324428,
     "jaccard_hagezi_1hosts": 0.24884464984002844
+  },
+  {
+    "date": "2025-11-29 15:21:10",
+    "priority_list_size": 300000,
+    "avg_priority_score": 9.733623333333334,
+    "avg_entropy": 2.7527063065226103,
+    "avg_new_domain_entropy": 2.740977285340783,
+    "domains_added": 277886,
+    "domains_removed": 9120,
+    "top_excluded_tld": "top",
+    "jaccard_hagezi_oisd": 0.22989480920528574,
+    "jaccard_hagezi_1hosts": 0.24884464984002844
   }
 ]
