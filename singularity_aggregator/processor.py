@@ -419,6 +419,14 @@ def main():
         # 5. Priority List Change Tracking
         change_report = track_priority_changes(priority_set, old_priority_set, logger)
 
+        # --- NEW: 5.1 Calculate Average Priority Score ---
+        if priority_count > 0:
+            avg_priority_score = sum(combined_counter[d] for d in priority_set) / priority_count
+        else:
+            avg_priority_score = 0.0
+        logger.info(f"🔬 Average score of priority list: {avg_priority_score:.2f}")
+        # --- END NEW ---
+
         # 5.5 Domain Property Analysis
         logger.info("🔬 Analyzing domain properties for Priority List...")
         priority_set_metrics = analyze_domain_properties(priority_set)
@@ -426,19 +434,15 @@ def main():
         new_domains = {d['domain'] for d in change_report.get('added', [])}
         new_domain_metrics = analyze_domain_properties(new_domains)
 
-        # --- NEW: 5.6 Calculate Priority List Score Metrics ---
-        logger.info("🔬 Analyzing score properties for Priority List...")
-        priority_list_total_score = sum(combined_counter[d] for d in priority_set)
-        priority_list_avg_score = (priority_list_total_score / priority_count) if priority_count > 0 else 0
-        # --- END NEW ---
-
         # 6. Reporting & Visualization
         generate_static_score_histogram(combined_counter, full_list, logger)
         generate_history_plot(history, logger)
         generate_historical_trends_plot(logger)
 
         generate_markdown_report(
-            priority_count, change, total_unfiltered, excluded_count_tld, full_list, combined_counter,
+            priority_count, 
+            avg_priority_score, # <-- NEW
+            change, total_unfiltered, excluded_count_tld, full_list, combined_counter,
             overlap_counter, source_metrics, history, logger, domain_sources, change_report,
             tld_exclusion_counter,
             report_policy_str,
@@ -447,7 +451,6 @@ def main():
             priority_set,
             priority_set_metrics,
             new_domain_metrics,
-            priority_list_avg_score,  # <-- NEW
             final_priority_filename
         )
 
@@ -462,7 +465,9 @@ def main():
         # 8. Save Metrics Caches
         save_metrics_cache(source_metrics)
         historical.create_and_save_snapshot(
-            logger, priority_count, priority_list_avg_score, # <-- NEW
+            logger, 
+            priority_count, 
+            avg_priority_score, # <-- NEW
             priority_set_metrics, new_domain_metrics,
             jaccard_matrix, change_report, tld_exclusion_counter
         )
