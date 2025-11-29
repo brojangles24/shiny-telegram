@@ -96,13 +96,13 @@ consensus_threshold = 11
 # Weights applied to each source
 [scoring.weights]
 # Both Lite and Xtra are defined. The script will pick one.
-HAGEZI_ULTIMATE = 6
-1HOSTS_LITE = 5
+HAGEZI_ULTIMATE = 7
+1HOSTS_LITE = 6
 1HOSTS_XTRA = 6 # New
-OISD_BIG = 4
+OISD_BIG = 5
 ANUDEEP_ADSERVERS = 4
 ADAWAY_HOSTS = 3
-STEVENBLACK_HOSTS = 2
+STEVENBLACK_HOSTS = 3
 ADGUARD_BASE = 5
 
 [sources]
