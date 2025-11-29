@@ -1,17 +1,16 @@
 """
 General utilities:
 - ConsoleLogger: Sets up logging.
-- Cache Functions: Load/save metrics cache.
-- History Tracking: track_history for the CSV.
-- Helpers: generate_sparkline, extract_tld.
+...
 """
 import sys
 import csv
 import logging
 import json
 import re
-import math  # <-- ADDED
+import math
 from datetime import datetime, timedelta
+from collections import Counter  # <-- ADD THIS LINE
 from pathlib import Path
 from typing import List, Dict, Set, Optional, Tuple, Any
 import idna
