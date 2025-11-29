@@ -9,7 +9,7 @@ import csv
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Dict, Set, Any
+from typing import List, Dict, Set, Any, Union
 
 # Import settings from our config module
 from . import config
@@ -18,7 +18,7 @@ from .utils import ConsoleLogger # Import logger for type hinting
 # --- File Writing, Archiving, and Cleanup Functions ---
 
 def cleanup_old_files(logger: ConsoleLogger):
-    """Deletes old files from cache and archive folders based on CACHE_CLEANUP_DAYS."""
+    """Deletes old files from cache and history folders based on CACHE_CLEANUP_DAYS."""
     cutoff_date = datetime.now() - timedelta(days=config.CACHE_CLEANUP_DAYS)
     deleted_count = 0
     
@@ -30,7 +30,7 @@ def cleanup_old_files(logger: ConsoleLogger):
         for item in directory.iterdir():
             if item.is_file():
                 # Archive files are cleaned by the new size-based function
-                if directory == config.ARCHIVE_DIR and item.name.startswith("priority_"):
+                if directory == config.ARCHIVE_DIR and item.name.endswith("_list_*.txt"):
                     continue
                     
                 if item.name.endswith((".txt", ".json", ".csv")):
@@ -48,7 +48,8 @@ def cleanup_old_files(logger: ConsoleLogger):
 
 def cleanup_archive_by_size(max_size_mb: int, logger: ConsoleLogger):
     """
-    Deletes the oldest archive files until the folder size is under max_size_mb.
+    Deletes the oldest archive files (*_list_*.txt) 
+    until the folder size is under max_size_mb.
     """
     max_size_bytes = max_size_mb * 1024 * 1024
     
@@ -56,8 +57,9 @@ def cleanup_archive_by_size(max_size_mb: int, logger: ConsoleLogger):
         return
 
     try:
+        # MODIFIED: Glob for all possible priority list archive names
         files = sorted(
-            [f for f in config.ARCHIVE_DIR.glob("priority_*.txt") if f.is_file()],
+            [f for f in config.ARCHIVE_DIR.glob("*_list_*.txt") if f.is_file()],
             key=lambda f: f.stat().st_mtime
         )
     except Exception as e:
@@ -95,17 +97,20 @@ def cleanup_archive_by_size(max_size_mb: int, logger: ConsoleLogger):
     logger.info(f"🧹 Cleaned up {deleted_count} old archive files. Freed {bytes_freed / 1024**2 :.1f}MB.")
 
 
-def archive_priority_list(logger: ConsoleLogger):
+def archive_priority_list(logger: ConsoleLogger, priority_filename: str): # <-- MODIFIED
     """Archives the primary priority list file with a timestamp."""
     config.ARCHIVE_DIR.mkdir(exist_ok=True)
     timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
     
-    source_path = config.OUTPUT_DIR / config.PRIORITY_FILENAME
+    source_path = config.OUTPUT_DIR / priority_filename # <-- MODIFIED
     if not source_path.exists():
         logger.error(f"Cannot archive: Source file not found at {source_path}")
         return
 
-    archive_path = config.ARCHIVE_DIR / f"priority_{timestamp}.txt"
+    # Create a "base name" from the filename, e.g., "aggressive_priority_list.txt" -> "aggressive_priority_list"
+    base_name = Path(priority_filename).stem
+    
+    archive_path = config.ARCHIVE_DIR / f"{base_name}_{timestamp}.txt" # <-- MODIFIED
     try:
         archive_path.write_bytes(source_path.read_bytes())
         logger.info(f"📦 Archived current priority list to {archive_path.name}")
@@ -135,8 +140,10 @@ def write_verbose_exclusion_report(
 
 def write_output_files(
     priority_set: Set[str], abused_tlds: Set[str], full_list: List[str], 
-    logger: ConsoleLogger, priority_cap_val: int, excluded_domains_verbose: List[Dict[str, Any]], 
-    write_verbose: bool, output_format: str
+    logger: ConsoleLogger, min_confidence_score: Union[int, str], 
+    excluded_domains_verbose: List[Dict[str, Any]], 
+    write_verbose: bool, output_format: str,
+    priority_filename: str # <-- NEW
 ):
     """Writes all final output files in the specified format."""
     logger.info("💾 Writing final output files...")
@@ -144,13 +151,15 @@ def write_output_files(
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M%S')
 
     # 1. Priority List
-    priority_file = config.OUTPUT_DIR / config.PRIORITY_FILENAME
+    priority_file = config.OUTPUT_DIR / priority_filename # <-- MODIFIED
+    
+    header_policy = f"Min Score: {min_confidence_score}"
     
     prefix = "0.0.0.0 " if output_format == 'hosts' else ""
     header = (
-        f"# Hosts File Priority {priority_cap_val} Blocklist (Actual size: {len(priority_set):,})\n"
+        f"# Hosts File Priority Blocklist (Policy: {header_policy}, Size: {len(priority_set):,})\n"
         if output_format == 'hosts'
-        else f"# Priority {priority_cap_val} Blocklist (Actual size: {len(priority_set):,})\n"
+        else f"# Priority Blocklist (Policy: {header_policy}, Size: {len(priority_set):,})\n"
     )
     header += f"# Generated: {now_str}\n"
 
@@ -160,7 +169,7 @@ def write_output_files(
         f.writelines(prefix + d + "\n" for d in sorted(priority_set))
     
     # 2. Archive the list
-    archive_priority_list(logger)
+    archive_priority_list(logger, priority_filename) # <-- MODIFIED
 
     # 3. Verbose Exclusion Report
     if write_verbose:
@@ -183,13 +192,15 @@ def write_output_files(
 def load_last_priority_from_archive(
     logger: ConsoleLogger, output_format: str
 ) -> Set[str]:
-    """Finds the most recent archive file and loads it into a set."""
+    """Finds the most recent archive file (*_list_*.txt) and loads it."""
     if not config.ARCHIVE_DIR.exists():
         logger.info("Archive directory not found. Skipping priority change tracking.")
         return set()
 
     try:
-        archive_files = list(config.ARCHIVE_DIR.glob("priority_*.txt"))
+        # MODIFIED: Glob for all possible priority list archive names
+        # This will catch "tiny_priority_list_...", "priority_list_...", etc.
+        archive_files = list(config.ARCHIVE_DIR.glob("*_list_*.txt"))
         if not archive_files:
             logger.info("No archive files found. Skipping priority change tracking.")
             return set()
