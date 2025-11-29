@@ -18,18 +18,19 @@ aggressiveness = 1
 use_tld_exclusion = true
 
 [policy_score_map]
-# Maps aggressiveness level (1-10) to the minimum weighted score
-# required for a domain to make the priority list.
-1 = 14
-2 = 12
-3 = 10
-4 = 8
-5 = 6 # Balanced
-6 = 5
-7 = 4  # Broad
-8 = 3
-9 = 2
-10 = 1 # Maximal
+# Maps aggressiveness level (1-10) to the minimum REQUIRED CONFIDENCE (as a percentage).
+# (Weights: Hagezi=6, 1Hosts-Lite=5, OISD=4, AdGuard=5, Anudeep=4, Adaway=3, Steven=2)
+# (Max Score: 29)
+1 = 70  # (Score >= 21) - Extremely High Confidence
+2 = 60  # (Score >= 18)
+3 = 50  # (Score >= 15)
+4 = 40  # (Score >= 12) - High Confidence (e.g., Hagezi + 1Hosts + Adaway)
+5 = 35  # (Score >= 11) - Balanced (e.g., Hagezi + 1Hosts)
+6 = 30  # (Score >= 9)  - Aggressive
+7 = 20  # (Score >= 6)  - Broad
+8 = 15  # (Score >= 5)
+9 = 10  # (Score >= 3)
+10 = 5  # (Score >= 2)  - Maximal (Catches almost everything)
 
 [policy_label_map]
 # Human-readable labels for aggressiveness levels
