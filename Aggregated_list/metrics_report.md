@@ -1,5 +1,5 @@
 # 🛡️ Singularity DNS Blocklist Dashboard (v5.8.4)
-*Generated: 2025-11-29 01:34:04*
+*Generated: 2025-11-29 01:37:22*
 
 ## 📜 Aggregation Summary
 | Metric | Count | Insight |
@@ -16,16 +16,16 @@
 These are the highest-scoring domains that failed to make the final list:
 | Domain | Weighted Score | Exclusion Reason |
 | :--- | :---: | :--- |
-| `ad.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
 | `optimix.asia` | <span style='color:red;'>**15**</span> | TLD Rejected: **.asia is marked as abusive.** |
-| `adserve.work` | <span style='color:red;'>**15**</span> | TLD Rejected: **.work is marked as abusive.** |
-| `crosspromotion.weplayer.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `stats.ozwebsites.biz` | <span style='color:red;'>**15**</span> | TLD Rejected: **.biz is marked as abusive.** |
 | `adop.cc` | <span style='color:red;'>**15**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `bitcoin-glorixsolution.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
-| `greenvolto.info` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
-| `apicepaycore.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
-| `funchill.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
-| `bevarapexapp.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `zlp6s.pw` | <span style='color:red;'>**15**</span> | TLD Rejected: **.pw is marked as abusive.** |
+| `adserve.work` | <span style='color:red;'>**15**</span> | TLD Rejected: **.work is marked as abusive.** |
+| `trackavapronxplatform.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `zhuahu.com` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `uralznak.ru` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `qihza.yt` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
+| `chronopost-securite.fr` | <span style='color:orange;'>**2**</span> | Score Cutoff: **Did not make Top 300,000** |
 
 *The complete list of 231,369 excluded domains is in `excluded_domains_report.csv`.*
 
@@ -51,9 +51,9 @@ Domains with these TLDs were excluded from the priority list.
 ## 🔄 Priority List Change & Novelty Index
 | Change Type | Domain Count | Novelty Breakdown |
 | :--- | :---: | :--- |
-| **Domains Added** | 18,894 | **18,894 Fresh** ✨ |
-| **Domains Removed** | 18,894 | |
-| **Domains Remained** | 281,106 | |
+| **Domains Added** | 18,853 | **18,853 Fresh** ✨ |
+| **Domains Removed** | 18,853 | |
+| **Domains Remained** | 281,147 | |
 
 ## 🌐 Source Performance & Health Check
 | Source | Category | Weight | Total Fetched | In Priority List | % List In Priority | Volatility ($\pm \%$) | Color |
@@ -108,21 +108,21 @@ The most common TLDs in the final `priority_300k.txt` list.
 
 | Rank | TLD | Domain Count | % of Priority List |
 | :---: | :--- | :---: | :---: |
-| 1 | **.com** | 181,272 | 60.42% |
-| 2 | **.net** | 23,193 | 7.73% |
-| 3 | **.de** | 7,465 | 2.49% |
-| 4 | **.org** | 6,493 | 2.16% |
-| 5 | **.xyz** | 6,083 | 2.03% |
-| 6 | **.ru** | 5,633 | 1.88% |
-| 7 | **.pro** | 4,718 | 1.57% |
-| 8 | **.fr** | 4,050 | 1.35% |
-| 9 | **.cn** | 3,823 | 1.27% |
-| 10 | **.br** | 3,660 | 1.22% |
-| 11 | **.io** | 3,560 | 1.19% |
-| 12 | **.info** | 3,341 | 1.11% |
-| 13 | **.jp** | 3,022 | 1.01% |
-| 14 | **.app** | 2,442 | 0.81% |
-| 15 | **.pl** | 2,336 | 0.78% |
+| 1 | **.com** | 181,403 | 60.47% |
+| 2 | **.net** | 23,257 | 7.75% |
+| 3 | **.de** | 7,485 | 2.50% |
+| 4 | **.org** | 6,456 | 2.15% |
+| 5 | **.xyz** | 6,086 | 2.03% |
+| 6 | **.ru** | 5,663 | 1.89% |
+| 7 | **.pro** | 4,722 | 1.57% |
+| 8 | **.fr** | 3,974 | 1.32% |
+| 9 | **.cn** | 3,830 | 1.28% |
+| 10 | **.br** | 3,647 | 1.22% |
+| 11 | **.io** | 3,565 | 1.19% |
+| 12 | **.info** | 3,337 | 1.11% |
+| 13 | **.jp** | 3,021 | 1.01% |
+| 14 | **.app** | 2,372 | 0.79% |
+| 15 | **.pl** | 2,332 | 0.78% |
 
 ---
 
