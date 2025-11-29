@@ -63,6 +63,8 @@ report_filename = "metrics_report.md"
 dashboard_html = "dashboard_html_removed.html"
 verbose_exclusion_file = "excluded_domains_report.csv"
 metrics_cache_file = "metrics_cache.json"
+historical_metrics_file = "historical_metrics.json" # Already exists from Phase 2
+domain_ledger_file = "domain_ledger.json" # <-- ADD THIS
 
 [network]
 # Max concurrent fetch workers
