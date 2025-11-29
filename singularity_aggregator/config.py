@@ -19,8 +19,18 @@ try:
 
     # --- [main] ---
     MAIN = _config.get("main", {})
-    PRIORITY_CAP_DEFAULT = MAIN.get("priority_cap", 300000)
     OUTPUT_FORMAT_DEFAULT = MAIN.get("output_format", "raw")
+
+    # --- [policy] ---
+    POLICY = _config.get("policy", {})
+    AGGRESSIVENESS_DEFAULT = POLICY.get("aggressiveness", 5)
+    USE_TLD_EXCLUSION_DEFAULT = POLICY.get("use_tld_exclusion", True)
+
+    # --- [policy_score_map] ---
+    # Convert string keys from TOML to int keys
+    POLICY_SCORE_MAP: Dict[int, int] = {
+        int(k): v for k, v in _config.get("policy_score_map", {}).items()
+    }
 
     # --- [paths] ---
     PATHS = _config.get("paths", {})
@@ -28,7 +38,7 @@ try:
     ARCHIVE_DIR_NAME = PATHS.get("archive_dir_name", "archive")
     ARCHIVE_DIR = OUTPUT_DIR / ARCHIVE_DIR_NAME
     
-    PRIORITY_FILENAME = PATHS.get("priority_filename", "priority_300k.txt")
+    PRIORITY_FILENAME = PATHS.get("priority_filename", "priority_list.txt")
     REGEX_TLD_FILENAME = PATHS.get("regex_tld_filename", "regex_hagezi_tlds.txt")
     UNFILTERED_FILENAME = PATHS.get("unfiltered_filename", "aggregated_full.txt")
     HISTORY_FILENAME = PATHS.get("history_filename", "history.csv")
@@ -51,16 +61,23 @@ try:
     TLDS = _config.get("tlds", {})
     HAGEZI_ABUSED_TLDS_URL = TLDS.get("hagezi_abused_tlds_url", "")
     NO_HAGEZI_TLDS_DEFAULT = TLDS.get("no_hagezi_tlds", False)
-    CUSTOM_TLD_FILE_DEFAULT = TLDS.get("custom_tld_file", None)
+    
+    _custom_tld_file_raw = TLDS.get("custom_tld_file")  # This will get "" or None
+    CUSTOM_TLD_FILE_DEFAULT = _custom_tld_file_raw if _custom_tld_file_raw else None # This converts "" to None
+    
     CUSTOM_BLOCK_TLDS = TLDS.get("custom_block_tlds", [])
 
     # --- [scoring] ---
     SCORING = _config.get("scoring", {})
     CONSENSUS_THRESHOLD = SCORING.get("consensus_threshold", 6)
+    # This is now mutable, will be modified by processor.py
     SOURCE_WEIGHTS: Dict[str, int] = _config.get("scoring", {}).get("weights", {})
-    MAX_SCORE = sum(SOURCE_WEIGHTS.values())
+    
+    # MAX_SCORE will be calculated dynamically in processor.py after source list modification
+    MAX_SCORE = 0
 
     # --- [sources] ---
+    # This is now mutable, will be modified by processor.py
     BLOCKLIST_SOURCES: Dict[str, str] = _config.get("sources", {})
 
     # --- [metadata] ---
