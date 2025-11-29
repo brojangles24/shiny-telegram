@@ -12,7 +12,8 @@ from collections import Counter
 from . import config
 from .utils import ConsoleLogger
 
-HISTORICAL_METRICS_FILE = config.OUTPUT_DIR / "historical_metrics.json"
+# --- UPDATED: Use the path from config.py ---
+HISTORICAL_METRICS_FILE = config.OUTPUT_DIR / config.PATHS.get("historical_metrics_file", "historical_metrics.json")
 
 def load_historical_metrics(logger: ConsoleLogger) -> List[Dict[str, Any]]:
     """Loads the list of historical metric snapshots."""
@@ -57,14 +58,11 @@ def create_and_save_snapshot(
     """
     logger.info("📈 Creating historical metrics snapshot...")
     
-    # Extract top TLD
     top_tld = None
     if tld_exclusion_counter:
-        top_tld = tld_exclusion_counter.most_common(1)[0][0] # ('xyz', 500) -> 'xyz'
+        top_tld = tld_exclusion_counter.most_common(1)[0][0]
 
-    # Extract key Jaccard similarities
     jac_hagezi_oisd = jaccard_matrix.get("HAGEZI_ULTIMATE", {}).get("OISD_BIG", 0.0)
-    # Find 1Hosts (Lite or Xtra) vs Hagezi
     jac_hagezi_1hosts_key = "1HOSTS_LITE" if "1HOSTS_LITE" in jaccard_matrix else "1HOSTS_XTRA"
     jac_hagezi_1hosts = jaccard_matrix.get("HAGEZI_ULTIMATE", {}).get(jac_hagezi_1hosts_key, 0.0)
 
@@ -80,12 +78,10 @@ def create_and_save_snapshot(
         "jaccard_hagezi_1hosts": jac_hagezi_1hosts
     }
     
-    # Load old history, append, and save
     history = load_historical_metrics(logger)
     history.append(snapshot)
     save_historical_metrics(history, logger)
     
-    # Prune history if it's getting too long (e.g., keep last 1000 runs)
     if len(history) > 1000:
         logger.info("Pruning old historical metrics...")
         save_historical_metrics(history[-1000:], logger)
