@@ -97,12 +97,13 @@ def generate_markdown_report(
     source_metrics: Dict[str, Dict[str, Union[int, str]]],
     history: List[Dict[str, str]], logger: ConsoleLogger, domain_sources: Dict[str, Set[str]],
     change_report: Dict[str, List[Dict[str, Any]]], tld_exclusion_counter: Counter, 
-    min_confidence_score: Union[int, str],  # <-- MODIFIED (can be int or str)
+    min_confidence_score: Union[int, str],
     excluded_domains_verbose: List[Dict[str, Any]],
     jaccard_matrix: Dict[str, Dict[str, float]],
     priority_set: Set[str],
     priority_set_metrics: Dict[str, Any],
-    new_domain_metrics: Dict[str, Any]
+    new_domain_metrics: Dict[str, Any],
+    priority_filename: str # <-- NEW
 ):
     """
     Creates a detailed, aesthetic Markdown report with enhanced metrics.
@@ -263,10 +264,10 @@ def generate_markdown_report(
 
     # --- DPA Sub-Section 1: Priority List Composition ---
     report.append("\n### 1. Final Priority List Composition")
-    report.append(f"Analysis of all domains in the final `{config.PRIORITY_FILENAME}` list.")
+    report.append(f"Analysis of all domains in the final `{priority_filename}` list.") # <-- MODIFIED
     
     # DPA: TLDs
-    report.append("\n**Top 15 TLDs in Priority List:**")
+    report.append(f"\n**Top 15 TLDs in `{priority_filename}`:**") # <-- MODIFIED
     priority_tld_counter = Counter(extract_tld(d) for d in priority_set if extract_tld(d))
     report.append("| Rank | TLD | Domain Count | % of Priority List |")
     report.append("| :---: | :--- | :---: | :---: |")
