@@ -10,7 +10,7 @@ output_format = "raw"
 # This now controls the *minimum confidence score* (see [policy_score_map]).
 # 1 = High-Confidence (Score 15+), 5 = Balanced (Score 10+), 10 = Max (Score 3+)
 # 11 = Special: Full list (Score 1+) WITH TLD exclusion.
-aggressiveness = 10
+aggressiveness = 11
 
 # Master switch for TLD filtering (for levels 1-10).
 # true = (Default) Exclude domains matching the abusive TLD list.
