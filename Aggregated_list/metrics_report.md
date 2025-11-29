@@ -1,11 +1,11 @@
 # 🛡️ Singularity DNS Blocklist Dashboard (v5.8.4)
-*Generated: 2025-11-29 09:22:32*
+*Generated: 2025-11-29 10:22:44*
 
 ## 📜 Aggregation Summary
 | Metric | Count | Insight |
 | :--- | :---: | :--- |
 | **Total Scored Domains** | **532,255** | Size of the list including TLD rejected entries. |
-| Change vs. Last Run | `+39` ⬆️ | Trend in the total unique domain pool. |
+| Change vs. Last Run | `+0` ➡️ | Trend in the total unique domain pool. |
 | Priority List Size | 300,000 | Domains with **Min Score: 1 (Filtered-Full) | Cap: 300,000** (Max: 33). |
 | High Consensus (Score 11+) | 133,634 | Domains backed by strong weighted evidence. |
 | **Avg. Priority Score** | **9.74** | Average confidence score of the final list. |
@@ -17,16 +17,16 @@
 These are the highest-scoring domains that failed to make the final list:
 | Domain | Weighted Score | Exclusion Reason |
 | :--- | :---: | :--- |
-| `stats.ozwebsites.biz` | <span style='color:red;'>**30**</span> | TLD Rejected: **.biz is marked as abusive.** |
 | `zlp6s.pw` | <span style='color:red;'>**30**</span> | TLD Rejected: **.pw is marked as abusive.** |
-| `ad.weplayer.cc` | <span style='color:red;'>**29**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `stats.ozwebsites.biz` | <span style='color:red;'>**30**</span> | TLD Rejected: **.biz is marked as abusive.** |
 | `adserve.work` | <span style='color:red;'>**29**</span> | TLD Rejected: **.work is marked as abusive.** |
-| `crosspromotion.weplayer.cc` | <span style='color:red;'>**29**</span> | TLD Rejected: **.cc is marked as abusive.** |
-| `cnrss.weebly.com` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
-| `country.bocaratongoldmine.info` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
-| `kids-indeed.gl.at.ply.gg` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
-| `2025edge.edgekh.com` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
-| `mqqadr.reader.qq.com` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
+| `optimix.asia` | <span style='color:red;'>**29**</span> | TLD Rejected: **.asia is marked as abusive.** |
+| `adop.cc` | <span style='color:red;'>**29**</span> | TLD Rejected: **.cc is marked as abusive.** |
+| `dc-historic.gl.at.ply.gg` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
+| `aefohouaencouea.ws` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
+| `upaep-mx.weebly.com` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
+| `dubaiescortsgirl.com` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
+| `fralimbo.net` | <span style='color:orange;'>**5**</span> | Cap Cutoff: **300,000 list. list** |
 
 *The complete list of 232,255 excluded domains is in `excluded_domains_report.csv`.*
 
@@ -103,21 +103,21 @@ Analysis of all domains in the final `filtered-full_priority_list.txt` list.
 **Top 15 TLDs in `filtered-full_priority_list.txt`:**
 | Rank | TLD | Domain Count | % of Priority List |
 | :---: | :--- | :---: | :---: |
-| 1 | **.com** | 182,899 | 60.97% |
-| 2 | **.net** | 23,781 | 7.93% |
-| 3 | **.pro** | 7,393 | 2.46% |
-| 4 | **.org** | 6,882 | 2.29% |
-| 5 | **.ru** | 6,566 | 2.19% |
-| 6 | **.de** | 6,546 | 2.18% |
-| 7 | **.xyz** | 5,592 | 1.86% |
-| 8 | **.fr** | 5,093 | 1.70% |
-| 9 | **.cn** | 3,979 | 1.33% |
-| 10 | **.info** | 3,901 | 1.30% |
-| 11 | **.io** | 3,759 | 1.25% |
-| 12 | **.app** | 3,595 | 1.20% |
-| 13 | **.pl** | 2,255 | 0.75% |
-| 14 | **.dev** | 2,117 | 0.71% |
-| 15 | **.uk** | 1,946 | 0.65% |
+| 1 | **.com** | 182,891 | 60.96% |
+| 2 | **.net** | 23,887 | 7.96% |
+| 3 | **.pro** | 7,332 | 2.44% |
+| 4 | **.org** | 6,858 | 2.29% |
+| 5 | **.ru** | 6,591 | 2.20% |
+| 6 | **.de** | 6,547 | 2.18% |
+| 7 | **.xyz** | 5,627 | 1.88% |
+| 8 | **.fr** | 5,013 | 1.67% |
+| 9 | **.cn** | 3,990 | 1.33% |
+| 10 | **.info** | 3,911 | 1.30% |
+| 11 | **.io** | 3,725 | 1.24% |
+| 12 | **.app** | 3,643 | 1.21% |
+| 13 | **.pl** | 2,261 | 0.75% |
+| 14 | **.dev** | 2,093 | 0.70% |
+| 15 | **.uk** | 1,912 | 0.64% |
 
 **Domain Properties:**
 | Property | Value | Insight |
@@ -128,12 +128,12 @@ Analysis of all domains in the final `filtered-full_priority_list.txt` list.
 **Domain Depth (Subdomains):**
 | Depth | Domain Count | % of Priority List | Example |
 | :---: | :---: | :---: | :--- |
-| 1 (e.g., d.d) | 181,216 | 60.41% | `google.com` |
-| 2 (e.g., d.d.d) | 95,338 | 31.78% | `ads.google.com` |
-| 3 (e.g., d.d.d.d) | 18,072 | 6.02% | `sub.ads.google.com` |
-| 4 (e.g., d.d.d.d.d) | 3,986 | 1.33% | `sub.ads.google.com` |
-| 5 (e.g., d.d.d.d.d.d) | 804 | 0.27% | `sub.ads.google.com` |
-| 6 (e.g., d.d.d.d.d.d.d) | 276 | 0.09% | `sub.ads.google.com` |
+| 1 (e.g., d.d) | 181,143 | 60.38% | `google.com` |
+| 2 (e.g., d.d.d) | 95,504 | 31.83% | `ads.google.com` |
+| 3 (e.g., d.d.d.d) | 18,020 | 6.01% | `sub.ads.google.com` |
+| 4 (e.g., d.d.d.d.d) | 3,954 | 1.32% | `sub.ads.google.com` |
+| 5 (e.g., d.d.d.d.d.d) | 794 | 0.26% | `sub.ads.google.com` |
+| 6 (e.g., d.d.d.d.d.d.d) | 277 | 0.09% | `sub.ads.google.com` |
 | 7 (e.g., d.d.d.d.d.d.d.d) | 39 | 0.01% | `sub.ads.google.com` |
 | 8 (e.g., d.d.d.d.d.d.d.d.d) | 49 | 0.02% | `sub.ads.google.com` |
 | 9 (e.g., d.d.d.d.d.d.d.d.d.d) | 134 | 0.04% | `sub.ads.google.com` |
@@ -148,7 +148,7 @@ Analysis of the **277,886** domains *added* to the list this run.
 | Property | Value | Insight |
 | :--- | :---: | :--- |
 | **Avg. *New* Domain Entropy** | `2.742` | 'Randomness' of *new* threats. A spike here is bad. |
-| **Top 5 *New* Trigrams** | `app`, `ing`, `ion`, `tra`, `ent` | Shows the 'shape' of new attack campaigns. |
+| **Top 5 *New* Trigrams** | `ing`, `app`, `ion`, `tra`, `ent` | Shows the 'shape' of new attack campaigns. |
 
 ---
 
